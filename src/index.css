@@ -1,0 +1,405 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet map default CSS (required) */
+@import 'leaflet/dist/leaflet.css';
+
+:root {
+  --app-bg: #f0f4f8; /* modern light blue canvas */
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --border-radius-sm: 0.375rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+  --border-radius-2xl: 1.5rem;
+}
+
+/* Dark theme overrides */
+.dark {
+  --app-bg: #0f172a;
+}
+
+html, body, #root { 
+  height: 100%; 
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth theme transition */
+body {
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease;
+  background-color: var(--app-bg);
+}
+
+/* Modern scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar::-webkit-scrollbar { 
+  width: 6px; 
+}
+.sidebar::-webkit-scrollbar-thumb { 
+  background: rgba(255,255,255,0.2); 
+  border-radius: 6px; 
+  transition: background 0.2s ease;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* Animation for success modal */
+@keyframes scale-in {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out;
+}
+
+/* Shimmer animation for sidebar active state */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite;
+}
+
+/* Slow pulse animation for header background */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Mobile Responsive Improvements */
+@media (max-width: 768px) {
+  /* Better touch targets */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent text size adjustment on iOS */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+  
+  /* Smooth scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent horizontal scroll */
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* Touch manipulation for better mobile performance */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Better focus states for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Responsive table wrapper */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modern glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced focus states */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Modern card styling */
+.card {
+  background: white;
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+}
+
+.dark .card {
+  background: #1e293b;
+  box-shadow: var(--shadow-xl);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Mobile-friendly scrollbar */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+}
+
+/* Enhanced Map Styling */
+.map-container-enhanced {
+  position: relative;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+              0 10px 10px -5px rgba(0, 0, 0, 0.04),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.dark .map-container-enhanced {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 
+              0 10px 10px -5px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Enhanced Leaflet map container */
+.map-enhanced {
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.map-enhanced .leaflet-container {
+  background: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.dark .map-enhanced .leaflet-container {
+  background: #0f172a;
+}
+
+/* Enhanced tile layer styling */
+.map-enhanced .leaflet-tile-container img {
+  filter: brightness(1.02) contrast(1.05) saturate(1.1);
+  transition: opacity 0.3s ease;
+}
+
+.dark .map-enhanced .leaflet-tile-container img {
+  filter: brightness(0.9) contrast(1.1) saturate(1.2);
+}
+
+/* Enhanced zoom controls */
+.map-enhanced .leaflet-control-zoom {
+  border: none;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+              0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dark .map-enhanced .leaflet-control-zoom {
+  background: rgba(30, 41, 59, 0.95);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 
+              0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.map-enhanced .leaflet-control-zoom a {
+  background-color: transparent;
+  color: #334155;
+  border: none;
+  font-size: 18px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  line-height: 30px;
+}
+
+.dark .map-enhanced .leaflet-control-zoom a {
+  color: #e2e8f0;
+}
+
+.map-enhanced .leaflet-control-zoom a:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  transform: scale(1.05);
+}
+
+.dark .map-enhanced .leaflet-control-zoom a:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.map-enhanced .leaflet-control-zoom-in {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .map-enhanced .leaflet-control-zoom-in {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced attribution */
+.map-enhanced .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 6px 0 0 0;
+  padding: 4px 8px;
+  font-size: 10px;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  border: none;
+  color: #64748b;
+}
+
+.dark .map-enhanced .leaflet-control-attribution {
+  background: rgba(30, 41, 59, 0.9);
+  color: #94a3b8;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.map-enhanced .leaflet-control-attribution a {
+  color: #3b82f6;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.map-enhanced .leaflet-control-attribution a:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Enhanced popup styling */
+.map-enhanced .leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+              0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 0;
+  overflow: hidden;
+}
+
+.dark .map-enhanced .leaflet-popup-content-wrapper {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 
+              0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.map-enhanced .leaflet-popup-tip {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .map-enhanced .leaflet-popup-tip {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced marker shadows */
+.map-enhanced .leaflet-marker-icon {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.map-enhanced .leaflet-marker-icon:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.2));
+  z-index: 1000;
+}
+
+/* Smooth map interactions */
+.map-enhanced .leaflet-container {
+  transition: filter 0.3s ease;
+}
+
+.map-enhanced .leaflet-container.leaflet-touch-zoom {
+  touch-action: pan-x pan-y;
+}
+
+/* Enhanced map loading state */
+.map-enhanced .leaflet-tile-loaded {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
