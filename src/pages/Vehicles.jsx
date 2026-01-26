@@ -66,10 +66,14 @@ const Vehicles = () => {
 
   // 🔹 Fetch vehicles from Firestore
   useEffect(() => {
+    console.log('🔥 Vehicles Page: Starting Firebase listener for vehicles collection...')
     const unsub = onSnapshot(collection(db, "vehicles"), (snapshot) => {
-      setVehicles(
-        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-      );
+      const vehiclesList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      console.log('✅ Vehicles Page: Fetched', vehiclesList.length, 'vehicles from Firebase', vehiclesList)
+      setVehicles(vehiclesList);
+    }, (error) => {
+      console.error('❌ Vehicles Page: Error fetching vehicles:', error);
+      console.error('Error code:', error.code, 'Message:', error.message);
     });
     return () => unsub();
   }, []);
@@ -170,6 +174,8 @@ const Vehicles = () => {
     }
 
     setSaving(true);
+    console.log('🔥 Vehicles: Starting save operation...');
+    
     try {
       const record = {
         carId,
@@ -202,53 +208,64 @@ const Vehicles = () => {
         },
       };
 
+      console.log('📝 Vehicles: Record to save:', record);
+
       // Get current user name for logging
       const userName = currentUser?.displayName || currentUser?.username || 'Admin';
 
       if (editingId) {
         // Update existing vehicle
-        await updateDoc(doc(db, "vehicles", editingId), record);
+        console.log('🔄 Vehicles: Updating vehicle with ID:', editingId);
+        const vehicleRef = doc(db, "vehicles", editingId);
+        await updateDoc(vehicleRef, record);
+        console.log('✅ Vehicles: Vehicle updated successfully in Firestore');
         
-        // Log the update activity
-        try {
-          await logVehicleUpdated(record, userName);
-          console.log('✅ Vehicle update logged to activityLogs');
-        } catch (logError) {
+        // Log the update activity (don't block on this)
+        logVehicleUpdated(record, userName).catch(logError => {
           console.error('⚠️ Error logging vehicle update:', logError);
-          toast.error('Vehicle updated but activity log failed. Check Firestore connection.');
-        }
+          // Don't show error toast for logging failures
+        });
         
         toast.success('Vehicle updated successfully!');
       } else {
         // Create new vehicle
-        await addDoc(collection(db, "vehicles"), record);
+        console.log('➕ Vehicles: Creating new vehicle...');
+        const vehiclesCollection = collection(db, "vehicles");
+        const docRef = await addDoc(vehiclesCollection, record);
+        console.log('✅ Vehicles: Vehicle created successfully in Firestore with ID:', docRef.id);
         
-        // Log the creation activity
-        try {
-          await logVehicleCreated(record, userName);
-          console.log('✅ Vehicle creation logged to activityLogs');
-        } catch (logError) {
+        // Log the creation activity (don't block on this)
+        logVehicleCreated(record, userName).catch(logError => {
           console.error('⚠️ Error logging vehicle creation:', logError);
-          toast.error('Vehicle added but activity log failed. Check Firestore connection.');
-        }
+          // Don't show error toast for logging failures
+        });
         
         toast.success('Vehicle added successfully!');
       }
 
       cancelWizard();
     } catch (error) {
-      console.error('❌ Error saving vehicle:', error);
+      console.error('❌ Vehicles: Error saving vehicle:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
       
       // Check if it's a Firestore connection error
       if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
         toast.error('Firestore connection error. Please check your internet connection and Firebase configuration.');
       } else if (error.code === 'permission-denied') {
-        toast.error('Permission denied. Check Firestore security rules.');
+        toast.error('Permission denied. Check Firestore security rules. Make sure you have write access to the "vehicles" collection.');
+      } else if (error.code === 'failed-precondition') {
+        toast.error('Firestore operation failed. The document may have been modified. Please refresh and try again.');
       } else {
-        toast.error(`Failed to save vehicle: ${error.message}`);
+        toast.error(`Failed to save vehicle: ${error.message || 'Unknown error'}`);
       }
     } finally {
       setSaving(false);
+      console.log('🏁 Vehicles: Save operation completed');
     }
   };
 

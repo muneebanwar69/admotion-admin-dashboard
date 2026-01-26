@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { FiUpload, FiEdit, FiTrash2 } from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Upload, Pencil, Trash2, Shield, Plus, X, AlertTriangle } from 'lucide-react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import { logAdminCreated, logAdminUpdated, logAdminDeleted } from '../services/activityLogger'
+import RealTimeIndicator from '../components/ui/RealTimeIndicator'
+import { hashPassword } from '../utils/password'
+import { sanitizeFormData } from '../utils/sanitize'
+import { validatePasswordStrength } from '../utils/password'
+import { useToast } from '../contexts/ToastContext'
 
 const Admin = () => {
   const [admins, setAdmins] = useState([])
@@ -12,6 +18,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const { currentUser } = useAuth()
+  const toast = useToast()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -88,56 +95,70 @@ const Admin = () => {
     
     // Validate required fields
     if (!formData.name || !formData.email || !formData.phoneNo || !formData.location) {
-      alert('Please fill in all required fields')
+      toast.error('Please fill in all required fields')
       return
     }
 
     // Validate password
     if (!formData.password) {
-      alert('Password is required')
+      toast.error('Password is required')
       return
+    }
+
+    // Validate password strength for new admins
+    if (!editingAdmin) {
+      const passwordValidation = validatePasswordStrength(formData.password)
+      if (!passwordValidation.valid) {
+        toast.error(`Password validation failed: ${passwordValidation.errors.join(', ')}`)
+        return
+      }
     }
     
     try {
+      // Sanitize all inputs
+      const sanitizedData = sanitizeFormData({
+        name: formData.name,
+        email: formData.email,
+        phoneNo: formData.phoneNo,
+        role: formData.role,
+        location: formData.location,
+        image: formData.image
+      })
+
+      // Hash password before saving
+      const hashedPassword = await hashPassword(formData.password)
+
       if (editingAdmin) {
         const adminRef = doc(db, 'admins', editingAdmin)
         const updateData = {
-          name: formData.name,
-          email: formData.email,
-          phoneNo: formData.phoneNo,
-          role: formData.role,
-          location: formData.location,
-          image: formData.image,
-          password: formData.password, // Always save password
+          ...sanitizedData,
+          password: hashedPassword,
           updatedAt: serverTimestamp()
         }
         await updateDoc(adminRef, updateData)
         await logAdminUpdated({
-          name: formData.name,
-          email: formData.email,
-          role: formData.role
+          name: sanitizedData.name,
+          email: sanitizedData.email,
+          role: sanitizedData.role
         }, userName)
+        toast.success('Admin updated successfully!')
       } else {
         await addDoc(collection(db, 'admins'), {
-          name: formData.name,
-          email: formData.email,
-          phoneNo: formData.phoneNo,
-          role: formData.role,
-          location: formData.location,
-          image: formData.image,
-          password: formData.password,
+          ...sanitizedData,
+          password: hashedPassword,
           createdAt: serverTimestamp()
         })
         await logAdminCreated({
-          name: formData.name,
-          email: formData.email,
-          role: formData.role
+          name: sanitizedData.name,
+          email: sanitizedData.email,
+          role: sanitizedData.role
         }, userName)
+        toast.success('Admin created successfully!')
       }
       setShowForm(false)
     } catch (error) {
       console.error('Error saving admin:', error)
-      alert('Failed to save admin: ' + error.message)
+      toast.error('Failed to save admin: ' + error.message)
     }
   }
 
@@ -160,10 +181,10 @@ const Admin = () => {
 
   if (loading) {
     return (
-      <div className='p-6 bg-gray-50 min-h-screen flex items-center justify-center'>
+      <div className='p-6 min-h-screen flex items-center justify-center'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
-          <p className='text-gray-600'>Loading...</p>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-brand-900 mx-auto mb-4'></div>
+          <p className='text-slate-600 dark:text-slate-400'>Loading...</p>
         </div>
       </div>
     )
@@ -171,270 +192,367 @@ const Admin = () => {
 
   // Access Control: Only Super Admin can access this page
   if (!isSuperAdmin) {
-  return (
-      <div className='p-6 bg-gray-50 min-h-screen flex items-center justify-center'>
-        <div className='text-center bg-white p-8 rounded-lg shadow-lg max-w-md'>
-          <div className='w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4'>
-            <svg className='w-8 h-8 text-red-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth='2' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' />
-            </svg>
+    return (
+      <div className='p-6 min-h-screen flex items-center justify-center'>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className='text-center bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl max-w-md border border-slate-200 dark:border-slate-700'
+        >
+          <div className='w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4'>
+            <AlertTriangle className='w-8 h-8 text-red-600 dark:text-red-400' />
           </div>
-          <h2 className='text-2xl font-bold text-gray-800 mb-2'>Access Denied</h2>
-          <p className='text-gray-600 mb-4'>
+          <h2 className='text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2'>Access Denied</h2>
+          <p className='text-slate-600 dark:text-slate-400 mb-4'>
             You don't have permission to access this page. Only Super Admins can manage admin accounts.
           </p>
-          <p className='text-sm text-gray-500'>
-            Current Role: <span className='font-semibold'>{currentUser?.role || 'User'}</span>
+          <p className='text-sm text-slate-500 dark:text-slate-500'>
+            Current Role: <span className='font-semibold text-brand-900 dark:text-blue-400'>{currentUser?.role || 'User'}</span>
           </p>
-        </div>
+        </motion.div>
       </div>
     )
   }
 
-              return (
-    <div className='p-6'>
+  return (
+    <div className='p-4 md:p-6 transition-colors duration-300'>
       {/* Admin List View */}
       {!showForm && (
         <div>
-          <div className='flex items-center justify-between mb-6'>
-            <h1 className='text-2xl font-bold text-gray-800'>Admin Management</h1>
-                <button
-              onClick={handleAddAdmin}
-              className='bg-[#101c44] text-white px-6 py-2.5 rounded-lg hover:bg-[#182b5b] transition-all duration-200 transform hover:scale-105 font-medium'
-            >
-              Add Admin
-                </button>
-              </div>
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className='bg-gradient-to-r from-brand-900 via-brand-800 to-brand-900 text-white px-6 py-4 rounded-xl shadow-lg mb-6 flex items-center justify-between border border-white/10'
+          >
+            <div className="flex items-center gap-3">
+              <Shield className="w-6 h-6" />
+              <h1 className='text-xl md:text-2xl font-bold'>Admin Management</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <RealTimeIndicator isActive={true} />
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleAddAdmin}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-semibold border border-white/20 transition-all duration-300"
+              >
+                <Plus size={18} /> Add Admin
+              </motion.button>
+            </div>
+          </motion.div>
 
-          <div className='bg-white rounded-lg shadow-sm border overflow-hidden'>
-            <table className='w-full'>
-                  <thead className='bg-[#101c44] text-white'>
-                    <tr>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Image</th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Name</th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Email</th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Role</th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Phone no</th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Location</th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>Password</th>
-                  <th className='px-6 py-4 text-center text-sm font-semibold'>Actions</th>
-                    </tr>
-                  </thead>
-              <tbody className='divide-y divide-gray-200'>
-                {admins.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className='bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden'
+          >
+            <div className="overflow-x-auto">
+              <table className='w-full'>
+                <thead className='bg-gradient-to-r from-brand-900 to-brand-800 text-white'>
                   <tr>
-                    <td colSpan='8' className='px-6 py-12 text-center text-gray-500'>
-                      No admins yet. Click "Add Admin" to create one.
-                    </td>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Image</th>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Name</th>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Email</th>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Role</th>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Phone</th>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Location</th>
+                    <th className='px-6 py-4 text-left text-sm font-semibold'>Password</th>
+                    <th className='px-6 py-4 text-center text-sm font-semibold'>Actions</th>
                   </tr>
-                ) : (
-                  admins.map((admin) => (
-                    <tr key={admin.id} className='hover:bg-gray-50 transition-colors duration-150'>
-                      <td className='px-6 py-4'>
-                        <div className='w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden'>
-                          {admin.image ? (
-                            <img src={admin.image} alt={admin.name} className='w-full h-full object-cover' />
-                          ) : (
-                            <span className='text-gray-500 text-xs'>No img</span>
-                          )}
+                </thead>
+                <tbody className='divide-y divide-slate-100 dark:divide-slate-700'>
+                  {admins.length === 0 ? (
+                    <tr>
+                      <td colSpan='8' className='px-6 py-12 text-center'>
+                        <div className='flex flex-col items-center'>
+                          <div className='w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-4'>
+                            <Shield className='w-8 h-8 text-slate-400 dark:text-slate-500' />
+                          </div>
+                          <p className='text-slate-600 dark:text-slate-400 font-medium'>No admins yet</p>
+                          <p className='text-slate-400 dark:text-slate-500 text-sm'>Click "Add Admin" to create one.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    admins.map((admin, index) => (
+                      <motion.tr 
+                        key={admin.id} 
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className='hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-200 group'
+                      >
+                        <td className='px-6 py-4'>
+                          <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-brand-900 to-brand-800 flex items-center justify-center overflow-hidden'>
+                            {admin.image ? (
+                              <img src={admin.image} alt={admin.name} className='w-full h-full object-cover' />
+                            ) : (
+                              <span className='text-white font-semibold text-sm'>{admin.name?.charAt(0).toUpperCase()}</span>
+                            )}
                           </div>
                         </td>
-                      <td className='px-6 py-4 text-sm text-gray-900'>{admin.name}</td>
-                      <td className='px-6 py-4 text-sm text-gray-600'>{admin.email}</td>
-                      <td className='px-6 py-4 text-sm text-gray-900'>{admin.role}</td>
-                      <td className='px-6 py-4 text-sm text-gray-600'>{admin.phoneNo}</td>
-                      <td className='px-6 py-4 text-sm text-gray-600'>{admin.location}</td>
-                      <td className='px-6 py-4 text-sm text-gray-600 font-mono'>
-                        {admin.password ? '••••••••' : 'Not set'}
+                        <td className='px-6 py-4 text-sm font-medium text-slate-800 dark:text-slate-200'>{admin.name}</td>
+                        <td className='px-6 py-4 text-sm text-slate-600 dark:text-slate-400'>{admin.email}</td>
+                        <td className='px-6 py-4'>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            admin.role === 'Super Admin' 
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' 
+                              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                          }`}>
+                            {admin.role}
+                          </span>
                         </td>
-                      <td className='px-6 py-4'>
-                        <div className='flex items-center justify-center gap-3'>
-                            <button
-                            onClick={() => handleEdit(admin)}
-                            className='text-blue-600 hover:text-blue-800 transition-colors duration-200'
-                            title='Edit'
+                        <td className='px-6 py-4 text-sm text-slate-600 dark:text-slate-400'>{admin.phoneNo}</td>
+                        <td className='px-6 py-4 text-sm text-slate-600 dark:text-slate-400'>{admin.location}</td>
+                        <td className='px-6 py-4 text-sm text-slate-400 font-mono'>
+                          {admin.password ? '••••••••' : 'Not set'}
+                        </td>
+                        <td className='px-6 py-4'>
+                          <div className='flex items-center justify-center gap-2'>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => handleEdit(admin)}
+                              className='p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all duration-200'
+                              title='Edit'
                             >
-                            <FiEdit className='w-5 h-5' />
-                            </button>
-                            <button
-                            onClick={() => setDeleteTarget(admin)}
-                            className='text-red-600 hover:text-red-800 transition-colors duration-200'
-                            title='Delete'
-                          >
-                            <FiTrash2 className='w-5 h-5' />
-                            </button>
+                              <Pencil className='w-4 h-4' />
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setDeleteTarget(admin)}
+                              className='p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200'
+                              title='Delete'
+                            >
+                              <Trash2 className='w-4 h-4' />
+                            </motion.button>
                           </div>
                         </td>
-                      </tr>
-                  ))
-                )}
-                  </tbody>
-                </table>
-              </div>
+                      </motion.tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-
-      {/* Add/Edit Admin Form */}
-      {showForm && (
-            <div>
-          <div className='mb-6'>
-            <h1 className='text-2xl font-bold text-gray-800'>
-              {editingAdmin ? 'Edit Admin' : 'Create NEW ADMIN'}
-            </h1>
-                    </div>
-
-          <div className='bg-white rounded-lg shadow-sm border p-8 max-w-3xl'>
-            <h2 className='text-lg font-semibold text-gray-800 mb-6'>Admin Management</h2>
-
-            <div className='grid grid-cols-2 gap-6'>
-              {/* Name */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>Name</label>
-                <input
-                  type='text'
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder='Zohaib'
-                  className='w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200'
-                />
-                    </div>
-
-              {/* E-mail */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>E-mail</label>
-                <input
-                  type='email'
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder='zohaib@gmail.com'
-                  className='w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200'
-                />
-                  </div>
-
-              {/* Phone No */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>Phone No</label>
-                <input
-                  type='tel'
-                  value={formData.phoneNo}
-                  onChange={(e) => setFormData({ ...formData, phoneNo: e.target.value })}
-                  placeholder='0345-5098765'
-                  className='w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200'
-                />
-                </div>
-
-              {/* Role */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className='w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200'
-                >
-                  <option value='Admin'>Admin</option>
-                  <option value='Moderator'>Moderator</option>
-                  <option value='Super Admin'>Super Admin</option>
-                </select>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>Location</label>
-                <input
-                  type='text'
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder='DHA'
-                  className='w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200'
-                />
-            </div>
-
-              {/* Password */}
-            <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>
-                  Password {!editingAdmin && <span className='text-red-500'>*</span>}
-                </label>
-                <input
-                  type='text'
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={editingAdmin ? 'Current password shown' : 'Enter password'}
-                  className='w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200'
-                />
-                <p className='text-xs text-gray-500 mt-1'>
-                  {editingAdmin 
-                    ? 'You can change the password by editing this field' 
-                    : 'This password will be used for admin login (use email as username)'}
-                </p>
-                </div>
-
-              {/* Attachment */}
-              <div className='col-span-2'>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>Attachment</label>
-                <label className='flex items-center justify-center gap-2 w-full px-4 py-2.5 border border-gray-300 rounded-lg cursor-pointer bg-[#101c44] text-white hover:bg-[#182b5b] transition-all duration-200'>
-                  <FiUpload className='w-4 h-4' />
-                  Upload Image
-                  <input
-                    type='file'
-                    accept='image/*'
-                    onChange={handleImageUpload}
-                    className='hidden'
-                  />
-                </label>
-                {formData.image && (
-                  <div className='mt-2'>
-                    <img src={formData.image} alt='Preview' className='w-20 h-20 rounded-lg object-cover' />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className='flex gap-4 mt-8'>
-              <button
-                onClick={handleSave}
-                className='bg-[#101c44] text-white px-8 py-2.5 rounded-lg hover:bg-[#182b5b] transition-all duration-200 transform hover:scale-105 font-medium'
-              >
-                Save
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className='bg-gray-200 text-gray-700 px-8 py-2.5 rounded-lg hover:bg-gray-300 transition-all duration-200 transform hover:scale-105 font-medium'
-              >
-                Cancel
-              </button>
-                      </div>
-                    </div>
-                  </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteTarget && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-          <div className='bg-white rounded-lg shadow-xl p-6 w-96'>
-            <h3 className='text-lg font-semibold text-gray-800 mb-4'>Confirm Delete</h3>
-            <p className='text-gray-600 mb-6'>
-              Are you sure you want to delete admin "{deleteTarget.name}"? This action cannot be undone.
-            </p>
-            <div className='flex justify-end gap-4'>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className='px-4 py-2 border rounded-lg hover:bg-gray-50 transition-all duration-200'
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200'
-              >
-                Delete
-              </button>
-            </div>
-          </div>
+          </motion.div>
         </div>
       )}
-  </div>
-)
+
+      {/* Add/Edit Admin Form */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            {/* Header */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className='bg-gradient-to-r from-brand-900 via-brand-800 to-brand-900 text-white px-6 py-4 rounded-xl shadow-lg mb-6 flex items-center justify-between border border-white/10'
+            >
+              <div className="flex items-center gap-3">
+                <Shield className="w-6 h-6" />
+                <h1 className='text-xl md:text-2xl font-bold'>
+                  {editingAdmin ? 'Edit Admin' : 'Create New Admin'}
+                </h1>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowForm(false)}
+                className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                <X size={20} />
+              </motion.button>
+            </motion.div>
+
+            <div className='bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 md:p-8 max-w-3xl'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                {/* Name */}
+                <div>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Name</label>
+                  <input
+                    type='text'
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder='Enter name'
+                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                  />
+                </div>
+
+                {/* E-mail */}
+                <div>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>E-mail</label>
+                  <input
+                    type='email'
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder='Enter email'
+                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                  />
+                </div>
+
+                {/* Phone No */}
+                <div>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Phone No</label>
+                  <input
+                    type='tel'
+                    value={formData.phoneNo}
+                    onChange={(e) => setFormData({ ...formData, phoneNo: e.target.value })}
+                    placeholder='0345-5098765'
+                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                  />
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                  >
+                    <option value='Admin'>Admin</option>
+                    <option value='Moderator'>Moderator</option>
+                    <option value='Super Admin'>Super Admin</option>
+                  </select>
+                </div>
+
+                {/* Location */}
+                <div>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Location</label>
+                  <input
+                    type='text'
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder='Enter location'
+                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                  />
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>
+                    Password {!editingAdmin && <span className='text-red-500'>*</span>}
+                  </label>
+                  <input
+                    type='text'
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder={editingAdmin ? 'Current password shown' : 'Enter password'}
+                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                  />
+                  <p className='text-xs text-slate-500 dark:text-slate-400 mt-2'>
+                    {editingAdmin 
+                      ? 'You can change the password by editing this field' 
+                      : 'This password will be used for admin login'}
+                  </p>
+                </div>
+
+                {/* Attachment */}
+                <div className='md:col-span-2'>
+                  <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Profile Image</label>
+                  <label className='flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-brand-900 dark:hover:border-blue-500 transition-all duration-300 text-slate-600 dark:text-slate-400'>
+                    <Upload className='w-5 h-5' />
+                    <span className='font-medium'>Click to upload image</span>
+                    <input
+                      type='file'
+                      accept='image/*'
+                      onChange={handleImageUpload}
+                      className='hidden'
+                    />
+                  </label>
+                  {formData.image && (
+                    <div className='mt-4 flex items-center gap-4'>
+                      <img src={formData.image} alt='Preview' className='w-16 h-16 rounded-xl object-cover border-2 border-slate-200 dark:border-slate-600' />
+                      <button
+                        onClick={() => setFormData({ ...formData, image: '' })}
+                        className='text-red-500 hover:text-red-600 text-sm font-medium'
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className='flex gap-4 mt-8'>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleSave}
+                  className='flex-1 bg-gradient-to-r from-brand-900 to-brand-800 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300'
+                >
+                  Save Admin
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowForm(false)}
+                  className='px-8 py-3 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300'
+                >
+                  Cancel
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'
+            onClick={() => setDeleteTarget(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className='bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700'
+            >
+              <div className='w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center'>
+                <Trash2 className='w-7 h-7 text-red-600 dark:text-red-400' />
+              </div>
+              <h3 className='text-xl font-bold text-slate-800 dark:text-slate-100 text-center mb-2'>Confirm Delete</h3>
+              <p className='text-slate-600 dark:text-slate-400 text-center mb-6'>
+                Are you sure you want to delete admin <span className='font-semibold text-slate-800 dark:text-slate-200'>"{deleteTarget.name}"</span>? This action cannot be undone.
+              </p>
+              <div className='flex gap-3'>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setDeleteTarget(null)}
+                  className='flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300'
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDelete}
+                  className='flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300'
+                >
+                  Delete
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
 }
 
 export default Admin

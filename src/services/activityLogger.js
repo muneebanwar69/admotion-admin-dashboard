@@ -95,7 +95,7 @@ const getColor = (action) => {
  */
 
 export const logAdCreated = (adData, userName) => {
-  logActivity('ad', 'created', {
+  return logActivity('ad', 'created', {
     adId: adData.adId,
     title: adData.title,
     company: adData.company,
@@ -104,7 +104,7 @@ export const logAdCreated = (adData, userName) => {
 }
 
 export const logAdUpdated = (adData, userName) => {
-  logActivity('ad', 'updated', {
+  return logActivity('ad', 'updated', {
     adId: adData.adId,
     title: adData.title,
     company: adData.company,
@@ -112,7 +112,7 @@ export const logAdUpdated = (adData, userName) => {
 }
 
 export const logAdDeleted = (adData, userName) => {
-  logActivity('ad', 'deleted', {
+  return logActivity('ad', 'deleted', {
     adId: adData.adId,
     title: adData.title,
     company: adData.company,
@@ -120,7 +120,7 @@ export const logAdDeleted = (adData, userName) => {
 }
 
 export const logVehicleCreated = (vehicleData, userName) => {
-  logActivity('vehicle', 'created', {
+  return logActivity('vehicle', 'created', {
     carId: vehicleData.carId,
     vehicleName: vehicleData.vehicleName,
     ownerName: vehicleData.ownerName,
@@ -129,7 +129,7 @@ export const logVehicleCreated = (vehicleData, userName) => {
 }
 
 export const logVehicleUpdated = (vehicleData, userName) => {
-  logActivity('vehicle', 'updated', {
+  return logActivity('vehicle', 'updated', {
     carId: vehicleData.carId,
     vehicleName: vehicleData.vehicleName,
     ownerName: vehicleData.ownerName,
@@ -137,7 +137,7 @@ export const logVehicleUpdated = (vehicleData, userName) => {
 }
 
 export const logVehicleDeleted = (vehicleData, userName) => {
-  logActivity('vehicle', 'deleted', {
+  return logActivity('vehicle', 'deleted', {
     carId: vehicleData.carId,
     vehicleName: vehicleData.vehicleName,
     ownerName: vehicleData.ownerName,
@@ -145,7 +145,7 @@ export const logVehicleDeleted = (vehicleData, userName) => {
 }
 
 export const logCampaignCreated = (campaignData, userName) => {
-  logActivity('campaign', 'created', {
+  return logActivity('campaign', 'created', {
     campaignId: campaignData.id,
     name: campaignData.name,
     startDate: campaignData.startDate,
@@ -154,33 +154,33 @@ export const logCampaignCreated = (campaignData, userName) => {
 }
 
 export const logCampaignUpdated = (campaignData, userName) => {
-  logActivity('campaign', 'updated', {
+  return logActivity('campaign', 'updated', {
     campaignId: campaignData.id,
     name: campaignData.name,
   }, userName)
 }
 
 export const logCampaignDeleted = (campaignData, userName) => {
-  logActivity('campaign', 'deleted', {
+  return logActivity('campaign', 'deleted', {
     campaignId: campaignData.id,
     name: campaignData.name,
   }, userName)
 }
 
 export const logUserLogin = (userName) => {
-  logActivity('login', 'logged_in', {
+  return logActivity('login', 'logged_in', {
     message: `${userName} logged into the system`,
   }, userName)
 }
 
 export const logUserLogout = (userName) => {
-  logActivity('logout', 'logged_out', {
+  return logActivity('logout', 'logged_out', {
     message: `${userName} logged out of the system`,
   }, userName)
 }
 
 export const logProfileUpdated = (profileData, userName) => {
-  logActivity('profile', 'updated', {
+  return logActivity('profile', 'updated', {
     name: profileData.name,
     email: profileData.email,
     contactNo: profileData.contactNo,
@@ -189,13 +189,13 @@ export const logProfileUpdated = (profileData, userName) => {
 }
 
 export const logPasswordChanged = (userName) => {
-  logActivity('profile', 'password_changed', {
+  return logActivity('profile', 'password_changed', {
     message: `${userName} changed their password`,
   }, userName)
 }
 
 export const logAdminCreated = (adminData, userName) => {
-  logActivity('admin', 'created', {
+  return logActivity('admin', 'created', {
     adminName: adminData.name,
     adminEmail: adminData.email,
     adminRole: adminData.role,
@@ -204,7 +204,7 @@ export const logAdminCreated = (adminData, userName) => {
 }
 
 export const logAdminUpdated = (adminData, userName) => {
-  logActivity('admin', 'updated', {
+  return logActivity('admin', 'updated', {
     adminName: adminData.name,
     adminEmail: adminData.email,
     adminRole: adminData.role,
@@ -213,7 +213,7 @@ export const logAdminUpdated = (adminData, userName) => {
 }
 
 export const logAdminDeleted = (adminData, userName) => {
-  logActivity('admin', 'deleted', {
+  return logActivity('admin', 'deleted', {
     adminName: adminData.name,
     adminEmail: adminData.email,
     message: `${userName} deleted admin: ${adminData.name}`,

@@ -5,12 +5,11 @@ import { db, storage } from '../firebase'
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { logAdCreated, logAdUpdated } from '../services/activityLogger'
+import { MAX_BASE64_SIZE, MAX_VIDEO_SIZE_MB, MAX_IMAGE_DIMENSION, ERROR_MESSAGES } from '../constants'
+import { sanitizeFormData } from '../utils/sanitize'
+import { validateFile } from '../utils/fileValidation'
 
 const UploadContext = createContext()
-
-// Max size for Firestore (in bytes) - leave room for other fields
-const MAX_BASE64_SIZE = 700 * 1024 // ~700KB base64 = ~500KB file
-const MAX_VIDEO_SIZE_MB = 100 // 100MB max for videos
 
 export const useUpload = () => {
   const context = useContext(UploadContext)
@@ -37,7 +36,7 @@ export const UploadProvider = ({ children }) => {
         let quality = 0.8
         
         // Max dimension for reasonable quality
-        const maxDimension = 1200
+        const maxDimension = MAX_IMAGE_DIMENSION
         
         // Scale down if too large
         if (width > maxDimension || height > maxDimension) {
@@ -141,6 +140,16 @@ export const UploadProvider = ({ children }) => {
       
       // Process file if provided
       if (file) {
+        // Validate file first
+        setUploads(prev => prev.map(u => 
+          u.id === uploadId ? { ...u, progress: 5, status: 'Validating file...' } : u
+        ))
+
+        const validation = await validateFile(file)
+        if (!validation.valid) {
+          throw new Error(validation.error || ERROR_MESSAGES.INVALID_FILE_TYPE)
+        }
+
         const fileSizeMB = file.size / (1024 * 1024)
         console.log(`📁 Processing file: ${file.name} (${fileSizeMB.toFixed(2)} MB)`)
 
@@ -211,15 +220,18 @@ export const UploadProvider = ({ children }) => {
         u.id === uploadId ? { ...u, progress: 85, status: 'Saving to database...' } : u
       ))
 
+      // Sanitize data before saving
+      const sanitizedData = sanitizeFormData(saveData)
+
       // Save to Firestore
       if (editingId) {
         const docRef = doc(db, "ads", editingId)
-        await updateDoc(docRef, { ...saveData, updatedAt: new Date().toISOString() })
-        await logAdUpdated(saveData, userName)
+        await updateDoc(docRef, { ...sanitizedData, updatedAt: new Date().toISOString() })
+        await logAdUpdated(sanitizedData, userName)
       } else {
-        saveData.createdAt = new Date().toISOString()
-        await addDoc(collection(db, "ads"), saveData)
-        await logAdCreated(saveData, userName)
+        sanitizedData.createdAt = new Date().toISOString()
+        await addDoc(collection(db, "ads"), sanitizedData)
+        await logAdCreated(sanitizedData, userName)
       }
 
       // Success!

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { FiMenu, FiLogOut, FiMapPin, FiBarChart2, FiBell, FiUser, FiHelpCircle, FiTruck, FiLayout, FiLayers, FiSun, FiMoon } from 'react-icons/fi'
+import { Menu, LogOut, MapPin, BarChart3, Bell, User, Truck, LayoutDashboard, Layers, Sun, Moon, Shield } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -9,14 +9,14 @@ import { useTheme } from '../../contexts/ThemeContext'
  * Wraps all pages to ensure consistent chrome and spacing.
  */
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: <FiLayout /> },
-  { to: '/vehicles', label: 'Vehicles Management', icon: <FiTruck /> },
-  { to: '/ads', label: 'Ads Management', icon: <FiLayers /> },
-  { to: '/scheduling', label: 'Scheduling', icon: <FiMapPin /> },
-  { to: '/analytics', label: 'Analytics', icon: <FiBarChart2 /> },
-  { to: '/alerts', label: 'Alerts Management', icon: <FiBell /> },
-  { to: '/my-profile', label: 'My Profile', icon: <FiUser /> },
-  { to: '/admin', label: 'Admin Management', icon: <FiUser /> },
+  { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { to: '/vehicles', label: 'Vehicles Management', icon: <Truck size={20} /> },
+  { to: '/ads', label: 'Ads Management', icon: <Layers size={20} /> },
+  { to: '/scheduling', label: 'Scheduling', icon: <MapPin size={20} /> },
+  { to: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
+  { to: '/alerts', label: 'Alerts Management', icon: <Bell size={20} /> },
+  { to: '/my-profile', label: 'My Profile', icon: <User size={20} /> },
+  { to: '/admin', label: 'Admin Management', icon: <Shield size={20} /> },
 ]
 
 const Layout = ({ children }) => {
@@ -82,7 +82,7 @@ const Layout = ({ children }) => {
             className='group relative p-2.5 md:p-2.5 rounded-xl hover:bg-white/15 transition-all duration-500 transform hover:scale-110 active:scale-95 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center'
           >
             <div className='absolute inset-0 bg-gradient-to-r from-amber-400/20 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
-            <FiMenu className='relative w-6 h-6 transition-all duration-500 group-hover:rotate-90 group-hover:text-amber-300' />
+            <Menu className='relative w-6 h-6 transition-all duration-500 group-hover:rotate-90 group-hover:text-amber-300' />
           </button>
           
           <div className='flex items-center gap-3'>
@@ -108,9 +108,9 @@ const Layout = ({ children }) => {
             <div className='absolute inset-0 bg-gradient-to-r from-amber-400/10 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
             <span className='relative transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12'>
               {theme === 'dark' ? (
-                <FiSun className='w-5 h-5 text-amber-300 group-hover:drop-shadow-lg' style={{ filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))' }} />
+                <Sun className='w-5 h-5 text-amber-300 group-hover:drop-shadow-lg' style={{ filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))' }} />
               ) : (
-                <FiMoon className='w-5 h-5 group-hover:text-amber-200 group-hover:drop-shadow-lg' />
+                <Moon className='w-5 h-5 group-hover:text-amber-200 group-hover:drop-shadow-lg' />
               )}
             </span>
             <span className='hidden sm:inline text-sm font-semibold transition-all duration-500 group-hover:font-bold group-hover:text-amber-200'>
@@ -133,7 +133,7 @@ const Layout = ({ children }) => {
                 />
               ) : (
                 <div className='w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center border-2 border-white/40 transition-all duration-500 group-hover:border-amber-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-amber-300/50'>
-                  <FiUser className='w-4 h-4 text-white' />
+                  <User className='w-4 h-4 text-white' />
                 </div>
               )}
               <div className='absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-brand-900 shadow-lg animate-pulse'></div>
@@ -149,7 +149,7 @@ const Layout = ({ children }) => {
             className='group relative inline-flex items-center gap-1.5 sm:gap-2.5 bg-white/10 hover:bg-red-500/20 backdrop-blur-sm px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-all duration-500 transform hover:scale-105 active:scale-95 border border-white/20 hover:border-red-400/40 hover:shadow-lg hover:shadow-red-400/20 touch-manipulation min-w-[44px] min-h-[44px] justify-center'
           >
             <div className='absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
-            <FiLogOut className='relative w-5 h-5 transition-all duration-500 group-hover:scale-110 group-hover:text-red-300 group-hover:rotate-12' style={{ filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.3))' }} />
+            <LogOut className='relative w-5 h-5 transition-all duration-500 group-hover:scale-110 group-hover:text-red-300 group-hover:rotate-12' style={{ filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.3))' }} />
             <span className='hidden sm:inline text-sm font-semibold transition-all duration-500 group-hover:font-bold group-hover:text-red-300'>
               Log out
             </span>

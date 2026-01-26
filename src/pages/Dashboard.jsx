@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import KpiCard from '../components/ui/KpiCard'
 import MapView from '../components/map/MapView'
-import { FiFlag, FiCheckSquare, FiTruck, FiTruck as FiTruck2 } from 'react-icons/fi'
+import { Flag, CheckSquare, Truck, Activity, MapPin } from 'lucide-react'
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { SkeletonKpiCard } from '../components/ui/SkeletonLoader'
@@ -63,19 +63,24 @@ const Dashboard = () => {
 
   // Real-time data fetching from Firebase
   useEffect(() => {
+    console.log('🔥 Dashboard: Starting Firebase listeners...')
+    
     // Subscribe to ads collection
     const unsubscribeAds = onSnapshot(collection(db, 'ads'), (snapshot) => {
       const adsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      console.log('✅ Dashboard: Fetched', adsData.length, 'ads from Firebase', adsData)
       setAds(adsData)
       setLoading(false)
     }, (error) => {
-      console.error('Error fetching ads:', error)
+      console.error('❌ Dashboard: Error fetching ads:', error)
+      console.error('Error code:', error.code, 'Message:', error.message)
       setLoading(false)
     })
 
     // Subscribe to vehicles collection
     const unsubscribeVehicles = onSnapshot(collection(db, 'vehicles'), async (snapshot) => {
       const vehiclesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      console.log('✅ Dashboard: Fetched', vehiclesData.length, 'vehicles from Firebase', vehiclesData)
       setVehicles(vehiclesData)
       
       // Fetch place names for vehicles
@@ -104,7 +109,8 @@ const Dashboard = () => {
         }
       }
     }, (error) => {
-      console.error('Error fetching vehicles:', error)
+      console.error('❌ Dashboard: Error fetching vehicles:', error)
+      console.error('Error code:', error.code, 'Message:', error.message)
     })
 
     // Cleanup subscriptions
@@ -194,10 +200,10 @@ const Dashboard = () => {
           </>
         ) : (
           <>
-            <KpiCard title='Total Ads' value={totalAds.toString()} icon={<FiFlag />} index={0} />
-            <KpiCard title='Active Ads' value={activeAds.toString()} icon={<FiCheckSquare />} index={1} />
-            <KpiCard title='Total Vehicles' value={totalVehicles.toString()} icon={<FiTruck />} index={2} />
-            <KpiCard title='Active Vehicles' value={activeVehicles.toString()} icon={<FiTruck2 />} index={3} />
+            <KpiCard title='Total Ads' value={totalAds.toString()} icon={<Flag />} index={0} />
+            <KpiCard title='Active Ads' value={activeAds.toString()} icon={<CheckSquare />} index={1} />
+            <KpiCard title='Total Vehicles' value={totalVehicles.toString()} icon={<Truck />} index={2} />
+            <KpiCard title='Active Vehicles' value={activeVehicles.toString()} icon={<Activity />} index={3} />
           </>
         )}
       </div>
@@ -263,7 +269,7 @@ const Dashboard = () => {
                     <td className="p-3 dark:text-slate-300 text-gray-600 max-w-[200px]" title={v.location}>
                       {v.hasLocation ? (
                         <span className="flex items-center gap-1.5">
-                          <span className="text-green-500 text-base">📍</span>
+                          <MapPin className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                           <span className="truncate">{v.location}</span>
                         </span>
                       ) : (

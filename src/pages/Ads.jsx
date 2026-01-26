@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search } from "lucide-react";
+import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers } from "lucide-react";
+import RealTimeIndicator from "../components/ui/RealTimeIndicator";
 import { db } from "../firebase";
 import {
   collection,
@@ -55,15 +56,18 @@ const Ads = () => {
 
   // ✅ Real-time fetch ads
   useEffect(() => {
+    console.log('🔥 Ads Page: Starting Firebase listener for ads collection...')
     const unsubscribe = onSnapshot(adsCollection, (snapshot) => {
       const adsList = snapshot.docs.map((doc) => ({
         ...doc.data(),
         docId: doc.id,
       }));
+      console.log('✅ Ads Page: Fetched', adsList.length, 'ads from Firebase', adsList)
       setAds(adsList);
       setLoading(false);
     }, (error) => {
-      console.error('Error fetching ads:', error);
+      console.error('❌ Ads Page: Error fetching ads:', error);
+      console.error('Error code:', error.code, 'Message:', error.message);
       toast.error('Failed to load ads');
       setLoading(false);
     });
@@ -230,23 +234,28 @@ const Ads = () => {
       {/* ✅ TABLE VIEW */}
       {!showForm && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <motion.h2
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="text-2xl font-bold text-slate-800 dark:text-slate-100"
-            >
-              Ads Management
-            </motion.h2>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleNewAd}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/50 hover:shadow-xl transition-all duration-300"
-            >
-              <PlusCircle size={18} /> New Ad
-            </motion.button>
-          </div>
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className='bg-gradient-to-r from-brand-900 via-brand-800 to-brand-900 text-white px-6 py-4 rounded-xl shadow-lg mb-6 flex items-center justify-between border border-white/10'
+          >
+            <div className="flex items-center gap-3">
+              <Layers className="w-6 h-6" />
+              <h1 className='text-xl md:text-2xl font-bold'>Ads Management</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <RealTimeIndicator isActive={!loading} />
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleNewAd}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-semibold border border-white/20 transition-all duration-300"
+              >
+                <PlusCircle size={18} /> New Ad
+              </motion.button>
+            </div>
+          </motion.div>
 
           {/* Search Filter */}
           <div className="mb-4">

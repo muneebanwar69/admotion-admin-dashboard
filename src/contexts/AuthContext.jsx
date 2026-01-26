@@ -8,6 +8,9 @@ import {
 import { auth, db } from '../firebase'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { logUserLogin, logUserLogout } from '../services/activityLogger'
+import { comparePassword } from '../utils/password'
+import { loginRateLimiter } from '../utils/rateLimiter'
+import { ERROR_MESSAGES } from '../constants'
 
 const AuthContext = createContext()
 
@@ -27,22 +30,14 @@ export function AuthProvider({ children }) {
   // Login function
   async function login(username, password) {
     try {
-      // First check if it's the main super admin
-      if (username === 'muneeb' && password === 'muneeb') {
-        const mockUser = {
-          uid: 'demo-user-123',
-          email: 'muneeb@example.com',
-          displayName: 'Muneeb',
-          username: 'muneeb',
-          role: 'Super Admin'
-        }
-        setCurrentUser(mockUser)
-        localStorage.setItem('currentUser', JSON.stringify(mockUser))
-        await logUserLogin(mockUser.displayName)
-        return Promise.resolve()
+      // Check rate limiting
+      if (!loginRateLimiter.isAllowed(username)) {
+        const remainingMs = loginRateLimiter.getRemainingTime(username)
+        const remainingMins = Math.ceil(remainingMs / 60000)
+        throw new Error(`Too many login attempts. Please try again in ${remainingMins} minute${remainingMins > 1 ? 's' : ''}.`)
       }
 
-      // Check Firebase admins collection for other admins
+      // Check Firebase admins collection
       const adminsRef = collection(db, 'admins')
       const q = query(adminsRef, where('email', '==', username))
       const querySnapshot = await getDocs(q)
@@ -51,8 +46,24 @@ export function AuthProvider({ children }) {
         const adminDoc = querySnapshot.docs[0]
         const adminData = adminDoc.data()
 
-        // Check password
-        if (adminData.password === password) {
+        // Check password using bcrypt
+        // Support both hashed (new) and plain text (legacy) passwords for migration
+        let passwordMatch = false
+        
+        if (adminData.password) {
+          // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+          if (adminData.password.startsWith('$2')) {
+            // Hashed password - use bcrypt compare
+            passwordMatch = await comparePassword(password, adminData.password)
+          } else {
+            // Legacy plain text password - compare directly (for migration period)
+            // TODO: Remove this after all passwords are migrated to hashed
+            passwordMatch = adminData.password === password
+            console.warn('⚠️ Using plain text password comparison. Please migrate to hashed passwords.')
+          }
+        }
+
+        if (passwordMatch) {
           const user = {
             uid: adminDoc.id,
             email: adminData.email,
@@ -65,15 +76,20 @@ export function AuthProvider({ children }) {
           }
           setCurrentUser(user)
           localStorage.setItem('currentUser', JSON.stringify(user))
+          
+          // Reset rate limiter on successful login
+          loginRateLimiter.reset(username)
+          
           await logUserLogin(user.displayName)
           return Promise.resolve()
         }
       }
 
       // If no match found, throw error
-      throw new Error('Invalid username or password')
+      throw new Error(ERROR_MESSAGES.INVALID_CREDENTIALS)
     } catch (error) {
-      throw new Error('Login failed: ' + error.message)
+      // Don't reset rate limiter on failure - it will block after max attempts
+      throw new Error(error.message || 'Login failed')
     }
   }
 
