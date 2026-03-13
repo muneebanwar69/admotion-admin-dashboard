@@ -134,14 +134,11 @@ export default function CampaignList() {
   };
 
   const onEdit = (c) => {
-    localStorage.setItem("campaign:edit", JSON.stringify(c));
-    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("campaign:edit", { detail: c }));
   };
 
   const onAddCampaign = () => {
-    localStorage.removeItem("campaign:edit"); // clear old data
-    localStorage.setItem("campaign:open", "true");
-    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("campaign:open"));
   };
 
   // ✅ Play Now - Instantly assign ads to all vehicles in the campaign

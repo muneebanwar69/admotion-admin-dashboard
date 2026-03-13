@@ -11,8 +11,9 @@ import { validateStep1, validateStep2, validateStep3 } from "../lib/validation";
 import { useToast } from "../contexts/ToastContext";
 import { useAuth } from "../contexts/AuthContext";
 import { logVehicleDeleted, logVehicleCreated, logVehicleUpdated } from "../services/activityLogger";
+import { Truck, CheckCircle, XCircle, Wrench } from "lucide-react";
 
-// 🔹 Firebase
+// Firebase
 import {
   collection,
   addDoc,
@@ -22,6 +23,68 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase";
+
+// Status count bar component
+const StatusCountBar = ({ vehicles }) => {
+  const activeCount = vehicles.filter(v => v.status === 'Active').length;
+  const inactiveCount = vehicles.filter(v => v.status === 'Inactive').length;
+  const maintenanceCount = vehicles.filter(v => v.status === 'Maintenance').length;
+
+  const counts = [
+    { label: 'Active', count: activeCount, icon: CheckCircle, gradient: 'from-emerald-500 via-emerald-600 to-teal-700', glow: 'shadow-emerald-500/30', accent: 'from-emerald-300 to-teal-300', iconBg: 'bg-emerald-400/20 border-emerald-300/20', line: 'from-teal-400 via-emerald-400 to-green-400' },
+    { label: 'Inactive', count: inactiveCount, icon: XCircle, gradient: 'from-rose-500 via-red-600 to-rose-700', glow: 'shadow-rose-500/30', accent: 'from-rose-300 to-pink-300', iconBg: 'bg-rose-400/20 border-rose-300/20', line: 'from-pink-400 via-rose-400 to-red-400' },
+    { label: 'Maintenance', count: maintenanceCount, icon: Wrench, gradient: 'from-amber-500 via-orange-600 to-amber-700', glow: 'shadow-amber-500/30', accent: 'from-amber-300 to-orange-300', iconBg: 'bg-amber-400/20 border-amber-300/20', line: 'from-yellow-400 via-amber-400 to-orange-400' },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5 }}
+      className="grid grid-cols-3 gap-4 mb-6"
+    >
+      {counts.map((item, index) => {
+        const Icon = item.icon;
+        return (
+          <motion.div
+            key={item.label}
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: index * 0.1, duration: 0.4 }}
+            whileHover={{ y: -6, scale: 1.02, transition: { duration: 0.25 } }}
+            whileTap={{ scale: 0.98 }}
+            className={`group relative flex items-center gap-3 p-5 rounded-2xl bg-gradient-to-br ${item.gradient} text-white shadow-xl ${item.glow} border border-white/10 overflow-hidden cursor-default`}
+          >
+            {/* Shimmer sweep */}
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            {/* Corner accent */}
+            <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl ${item.accent} opacity-10 rounded-bl-full group-hover:opacity-20 transition-opacity duration-300`} />
+            <motion.div
+              className={`relative z-10 w-11 h-11 rounded-xl ${item.iconBg} border backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300`}
+              whileHover={{ rotate: 5 }}
+            >
+              <Icon className="w-5 h-5 text-white" />
+            </motion.div>
+            <div className="relative z-10">
+              <p className="text-2xl font-bold text-white counter-value">{item.count}</p>
+              <p className="text-xs text-white/70 font-semibold tracking-wider uppercase">{item.label}</p>
+            </div>
+            {/* Bottom accent line */}
+            <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.line}`}>
+              <motion.div
+                className="h-full w-1/3 bg-white/30 rounded-full"
+                animate={{ x: ['0%', '200%', '0%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </div>
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+};
 
 const Vehicles = () => {
   const toast = useToast();
@@ -64,18 +127,48 @@ const Vehicles = () => {
     regDocName: "",
   });
 
-  // 🔹 Fetch vehicles from Firestore
+  // Fetch vehicles from Firestore
   useEffect(() => {
-    console.log('🔥 Vehicles Page: Starting Firebase listener for vehicles collection...')
-    const unsub = onSnapshot(collection(db, "vehicles"), (snapshot) => {
-      const vehiclesList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      console.log('✅ Vehicles Page: Fetched', vehiclesList.length, 'vehicles from Firebase', vehiclesList)
-      setVehicles(vehiclesList);
-    }, (error) => {
-      console.error('❌ Vehicles Page: Error fetching vehicles:', error);
-      console.error('Error code:', error.code, 'Message:', error.message);
-    });
-    return () => unsub();
+    let isActive = true;
+    let retryCount = 0;
+
+    const setupListener = () => {
+      if (!isActive) return;
+
+      try {
+        const unsub = onSnapshot(collection(db, "vehicles"), (snapshot) => {
+          if (!isActive) return;
+          const vehiclesList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          setVehicles(vehiclesList);
+          retryCount = 0;
+        }, (error) => {
+          if (!isActive) return;
+
+          if (error.code === 'internal' || error.message?.includes('ASSERTION')) {
+            if (retryCount < 2) {
+              retryCount++;
+              setTimeout(setupListener, 500 * retryCount);
+            }
+          } else {
+            console.error('Vehicles Page: Error fetching vehicles:', error);
+          }
+        });
+
+        return () => {
+          isActive = false;
+          unsub();
+        };
+      } catch (err) {
+        console.error('Failed to set up vehicles listener:', err);
+        if (retryCount < 2) {
+          retryCount++;
+          setTimeout(setupListener, 500 * retryCount);
+        }
+      }
+    };
+
+    const cleanup = setupListener();
+    return cleanup;
   }, []);
 
   const stepValid = useMemo(() => {
@@ -90,35 +183,9 @@ const Vehicles = () => {
     setCurrentStep(1);
     setEditingId(null);
     setCarId(generateCarId(vehicles));
-    setStep1({
-      type: "",
-      vehicleName: "",
-      ownerName: "",
-      model: "",
-      color: "",
-      cnic: "",
-      duration: "",
-      registrationDate: "",
-      password: "",
-    });
-    setStep2({
-      firstName: "",
-      lastName: "",
-      cnic: "",
-      email: "",
-      accountTitle: "",
-      accountNo: "",
-      iban: "",
-      bankName: "",
-    });
-    setStep3({
-      cnicFrontFile: null,
-      cnicBackFile: null,
-      regDocFile: null,
-      cnicFrontName: "",
-      cnicBackName: "",
-      regDocName: "",
-    });
+    setStep1({ type: "", vehicleName: "", ownerName: "", model: "", color: "", cnic: "", duration: "", registrationDate: "", password: "" });
+    setStep2({ firstName: "", lastName: "", cnic: "", email: "", accountTitle: "", accountNo: "", iban: "", bankName: "" });
+    setStep3({ cnicFrontFile: null, cnicBackFile: null, regDocFile: null, cnicFrontName: "", cnicBackName: "", regDocName: "" });
   };
 
   const startEdit = (v) => {
@@ -127,33 +194,16 @@ const Vehicles = () => {
     setEditingId(v.id);
     setCarId(v.carId);
     setStep1({
-      type: v.type,
-      vehicleName: v.vehicleName,
-      ownerName: v.ownerName,
-      model: v.model,
-      color: v.color,
-      cnic: v.cnic,
-      duration: v.duration,
-      registrationDate: v.registrationDate,
-      password: v.password || "",
+      type: v.type, vehicleName: v.vehicleName, ownerName: v.ownerName, model: v.model,
+      color: v.color, cnic: v.cnic, duration: v.duration, registrationDate: v.registrationDate, password: v.password || "",
     });
     setStep2({
-      firstName: v.owner.firstName,
-      lastName: v.owner.lastName,
-      cnic: v.owner.cnic,
-      email: v.owner.email,
-      accountTitle: v.bank.accountTitle,
-      accountNo: v.bank.accountNo,
-      iban: v.bank.iban,
-      bankName: v.bank.bankName,
+      firstName: v.owner.firstName, lastName: v.owner.lastName, cnic: v.owner.cnic, email: v.owner.email,
+      accountTitle: v.bank.accountTitle, accountNo: v.bank.accountNo, iban: v.bank.iban, bankName: v.bank.bankName,
     });
     setStep3({
-      cnicFrontFile: null,
-      cnicBackFile: null,
-      regDocFile: null,
-      cnicFrontName: v.docs.cnicFrontName || "",
-      cnicBackName: v.docs.cnicBackName || "",
-      regDocName: v.docs.regDocName || "",
+      cnicFrontFile: null, cnicBackFile: null, regDocFile: null,
+      cnicFrontName: v.docs.cnicFrontName || "", cnicBackName: v.docs.cnicBackName || "", regDocName: v.docs.regDocName || "",
     });
   };
 
@@ -166,7 +216,7 @@ const Vehicles = () => {
   const next = () => stepValid && setCurrentStep((s) => Math.min(3, s + 1));
   const back = () => setCurrentStep((s) => Math.max(1, s - 1));
 
-  // 🔹 Save to Firestore
+  // Save to Firestore
   const saveWizard = async () => {
     if (!validateStep1(step1) || !validateStep2(step2) || !validateStep3(step3)) {
       toast.warning('Please fill in all required fields');
@@ -174,154 +224,84 @@ const Vehicles = () => {
     }
 
     setSaving(true);
-    console.log('🔥 Vehicles: Starting save operation...');
-    
+
     try {
       const record = {
-        carId,
-        type: step1.type,
-        vehicleName: step1.vehicleName,
-        ownerName: step1.ownerName,
-        model: step1.model,
-        color: step1.color,
-        cnic: step1.cnic,
-        duration: step1.duration,
-        registrationDate: step1.registrationDate,
-        password: step1.password,
-        status: "Active",
-        owner: {
-          firstName: step2.firstName,
-          lastName: step2.lastName,
-          cnic: step2.cnic,
-          email: step2.email,
-        },
-        bank: {
-          accountTitle: step2.accountTitle,
-          accountNo: step2.accountNo,
-          iban: step2.iban,
-          bankName: step2.bankName,
-        },
-        docs: {
-          cnicFrontName: step3.cnicFrontName,
-          cnicBackName: step3.cnicBackName,
-          regDocName: step3.regDocName,
-        },
+        carId, type: step1.type, vehicleName: step1.vehicleName, ownerName: step1.ownerName,
+        model: step1.model, color: step1.color, cnic: step1.cnic, duration: step1.duration,
+        registrationDate: step1.registrationDate, password: step1.password, status: "Active",
+        owner: { firstName: step2.firstName, lastName: step2.lastName, cnic: step2.cnic, email: step2.email },
+        bank: { accountTitle: step2.accountTitle, accountNo: step2.accountNo, iban: step2.iban, bankName: step2.bankName },
+        docs: { cnicFrontName: step3.cnicFrontName, cnicBackName: step3.cnicBackName, regDocName: step3.regDocName },
       };
 
-      console.log('📝 Vehicles: Record to save:', record);
-
-      // Get current user name for logging
       const userName = currentUser?.displayName || currentUser?.username || 'Admin';
 
       if (editingId) {
-        // Update existing vehicle
-        console.log('🔄 Vehicles: Updating vehicle with ID:', editingId);
         const vehicleRef = doc(db, "vehicles", editingId);
         await updateDoc(vehicleRef, record);
-        console.log('✅ Vehicles: Vehicle updated successfully in Firestore');
-        
-        // Log the update activity (don't block on this)
-        logVehicleUpdated(record, userName).catch(logError => {
-          console.error('⚠️ Error logging vehicle update:', logError);
-          // Don't show error toast for logging failures
-        });
-        
+        logVehicleUpdated(record, userName).catch(() => {});
         toast.success('Vehicle updated successfully!');
       } else {
-        // Create new vehicle
-        console.log('➕ Vehicles: Creating new vehicle...');
         const vehiclesCollection = collection(db, "vehicles");
-        const docRef = await addDoc(vehiclesCollection, record);
-        console.log('✅ Vehicles: Vehicle created successfully in Firestore with ID:', docRef.id);
-        
-        // Log the creation activity (don't block on this)
-        logVehicleCreated(record, userName).catch(logError => {
-          console.error('⚠️ Error logging vehicle creation:', logError);
-          // Don't show error toast for logging failures
-        });
-        
+        await addDoc(vehiclesCollection, record);
+        logVehicleCreated(record, userName).catch(() => {});
         toast.success('Vehicle added successfully!');
       }
 
       cancelWizard();
     } catch (error) {
-      console.error('❌ Vehicles: Error saving vehicle:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
-      
-      // Check if it's a Firestore connection error
+      console.error('Vehicles: Error saving vehicle:', error);
+
       if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
-        toast.error('Firestore connection error. Please check your internet connection and Firebase configuration.');
+        toast.error('Firestore connection error. Please check your internet connection.');
       } else if (error.code === 'permission-denied') {
-        toast.error('Permission denied. Check Firestore security rules. Make sure you have write access to the "vehicles" collection.');
-      } else if (error.code === 'failed-precondition') {
-        toast.error('Firestore operation failed. The document may have been modified. Please refresh and try again.');
+        toast.error('Permission denied. Check Firestore security rules.');
       } else {
         toast.error(`Failed to save vehicle: ${error.message || 'Unknown error'}`);
       }
     } finally {
       setSaving(false);
-      console.log('🏁 Vehicles: Save operation completed');
     }
   };
 
-  // 🔹 Delete from Firestore
+  // Delete from Firestore
   const doDelete = async () => {
     if (askDeleteId) {
       try {
-        // Find the vehicle document ID by carId if askDeleteId is a carId
         let docId = askDeleteId;
         const vehicle = vehicles.find(v => v.id === askDeleteId || v.carId === askDeleteId);
-        
+
         if (!vehicle) {
           toast.error('Vehicle not found. Please refresh and try again.');
           return;
         }
-        
-        if (vehicle.id) {
-          docId = vehicle.id; // Use the Firestore document ID
-        }
-        
+
+        if (vehicle.id) docId = vehicle.id;
+
         if (docId) {
-          // Get vehicle data before deleting for logging
           const vehicleData = {
             carId: vehicle.carId || vehicle.id,
             vehicleName: vehicle.vehicleName || vehicle.type || 'Unknown',
             ownerName: vehicle.ownerName || vehicle.owner?.firstName || 'Unknown',
           };
-          
-          // Get current user name for logging
+
           const userName = currentUser?.displayName || currentUser?.username || 'Admin';
-          
-          // Delete the vehicle from Firestore
+
           await deleteDoc(doc(db, "vehicles", docId));
-          
-          // Log the deletion activity
+
           try {
             await logVehicleDeleted(vehicleData, userName);
-            console.log('✅ Vehicle deletion logged to activityLogs');
           } catch (logError) {
-            console.error('⚠️ Error logging vehicle deletion:', logError);
-            // Don't fail the delete if logging fails, but show warning
-            toast.error('Vehicle deleted but activity log failed. Check Firestore connection.');
+            console.error('Error logging vehicle deletion:', logError);
           }
-          
+
           toast.success('Vehicle deleted successfully!');
           setAskDeleteId(null);
-        } else {
-          toast.error('Vehicle document ID not found. Please refresh and try again.');
         }
       } catch (error) {
-        console.error('❌ Error deleting vehicle:', error);
-        
-        // Check if it's a Firestore connection error
-        if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
-          toast.error('Firestore connection error. Please check your internet connection and Firebase configuration.');
-        } else if (error.code === 'permission-denied') {
+        console.error('Error deleting vehicle:', error);
+        if (error.code === 'permission-denied') {
           toast.error('Permission denied. Check Firestore security rules.');
         } else {
           toast.error(`Failed to delete vehicle: ${error.message}`);
@@ -332,7 +312,14 @@ const Vehicles = () => {
 
   if (mode === "list") {
     return (
-      <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-6"
+      >
+        {/* Status Count Bar */}
+        <StatusCountBar vehicles={vehicles} />
+
         <VehicleList
           vehicles={vehicles}
           onAdd={startAdd}
@@ -344,7 +331,7 @@ const Vehicles = () => {
           onCancel={() => setAskDeleteId(null)}
           onConfirm={doDelete}
         />
-      </>
+      </motion.div>
     );
   }
 
@@ -354,7 +341,13 @@ const Vehicles = () => {
       animate={{ opacity: 1, y: 0 }}
       className="p-6"
     >
-      <div className="bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 rounded-xl border border-slate-200 shadow-lg p-6 transition-colors duration-300">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-50px" }}
+        transition={{ duration: 0.5 }}
+        className="bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 rounded-2xl border border-slate-200 shadow-xl p-6 transition-colors duration-300"
+      >
         <div className="flex items-center justify-between mb-6">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -364,10 +357,10 @@ const Vehicles = () => {
             {editingId ? "Edit Vehicle" : "Add Vehicle"}
           </motion.div>
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={cancelWizard}
-            className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
           >
             Cancel
           </motion.button>
@@ -395,32 +388,28 @@ const Vehicles = () => {
 
         <StepIndicator current={currentStep} />
 
-        <div className="mt-4">
+        <motion.div
+          key={currentStep}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mt-4"
+        >
           {currentStep === 1 && (
-            <Step1Basic
-              carId={carId}
-              data={step1}
-              onChange={(partial) => setStep1((s) => ({ ...s, ...partial }))}
-            />
+            <Step1Basic carId={carId} data={step1} onChange={(partial) => setStep1((s) => ({ ...s, ...partial }))} />
           )}
           {currentStep === 2 && (
-            <Step2OwnerBank
-              data={step2}
-              onChange={(partial) => setStep2((s) => ({ ...s, ...partial }))}
-            />
+            <Step2OwnerBank data={step2} onChange={(partial) => setStep2((s) => ({ ...s, ...partial }))} />
           )}
           {currentStep === 3 && (
-            <Step3Documents
-              data={step3}
-              onChange={(partial) => setStep3((s) => ({ ...s, ...partial }))}
-            />
+            <Step3Documents data={step3} onChange={(partial) => setStep3((s) => ({ ...s, ...partial }))} />
           )}
-        </div>
+        </motion.div>
 
         <div className="mt-6 flex justify-between">
           <motion.button
-            whileHover={currentStep !== 1 ? { scale: 1.05 } : {}}
-            whileTap={currentStep !== 1 ? { scale: 0.95 } : {}}
+            whileHover={currentStep !== 1 ? { scale: 1.02 } : {}}
+            whileTap={currentStep !== 1 ? { scale: 0.98 } : {}}
             onClick={back}
             disabled={currentStep === 1}
             className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
@@ -433,8 +422,8 @@ const Vehicles = () => {
           </motion.button>
           {currentStep < 3 ? (
             <motion.button
-              whileHover={stepValid ? { scale: 1.05 } : {}}
-              whileTap={stepValid ? { scale: 0.95 } : {}}
+              whileHover={stepValid ? { scale: 1.02 } : {}}
+              whileTap={stepValid ? { scale: 0.98 } : {}}
               onClick={next}
               disabled={!stepValid}
               className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
@@ -443,12 +432,12 @@ const Vehicles = () => {
                   : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
               }`}
             >
-              Next →
+              Next
             </motion.button>
           ) : (
             <motion.button
-              whileHover={stepValid && !saving ? { scale: 1.05 } : {}}
-              whileTap={stepValid && !saving ? { scale: 0.95 } : {}}
+              whileHover={stepValid && !saving ? { scale: 1.02 } : {}}
+              whileTap={stepValid && !saving ? { scale: 0.98 } : {}}
               onClick={saveWizard}
               disabled={!stepValid || saving}
               className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
@@ -466,12 +455,12 @@ const Vehicles = () => {
                   Saving...
                 </>
               ) : (
-                '✓ Save'
+                'Save'
               )}
             </motion.button>
           )}
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 };

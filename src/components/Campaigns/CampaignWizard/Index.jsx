@@ -101,53 +101,44 @@ export default function CampaignWizard() {
     message: "",
   });
 
-  // Listen to localStorage signals
+  // Listen to custom events from CampaignList
   useEffect(() => {
-    const handler = () => {
-      const openFlag = localStorage.getItem("campaign:open");
-      const edit = localStorage.getItem("campaign:edit");
-      if (openFlag) {
-        setEditing(null);
-        setForm(emptyForm); // ✅ always blank for new campaign
+    const handleOpen = () => {
+      setEditing(null);
+      setForm(emptyForm);
+      setStep(0);
+      setOpen(true);
+    };
+
+    const handleEdit = (e) => {
+      try {
+        const c = e.detail;
+        setEditing(c);
+        setForm({
+          name: c.name || "",
+          cities: c.cities || [],
+          startDate: c.startDate ? c.startDate.slice(0, 10) : "",
+          endDate: c.endDate ? c.endDate.slice(0, 10) : "",
+          weekdays: c.weekdays || { mon: false, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false },
+          timeSlots: c.timeSlots || [],
+          budget: c.budget || "",
+          notes: c.notes || "",
+          ads: c.ads || [],
+          vehicles: c.vehicles || [],
+        });
         setStep(0);
         setOpen(true);
-        localStorage.removeItem("campaign:open");
-      }
-      if (edit) {
-        try {
-          const c = JSON.parse(edit);
-          setEditing(c);
-          setForm({
-            name: c.name || "",
-            cities: c.cities || [],
-            startDate: c.startDate ? c.startDate.slice(0, 10) : "",
-            endDate: c.endDate ? c.endDate.slice(0, 10) : "",
-            weekdays:
-              c.weekdays || {
-                mon: false,
-                tue: false,
-                wed: false,
-                thu: false,
-                fri: false,
-                sat: false,
-                sun: false,
-              },
-            timeSlots: c.timeSlots || [],
-            budget: c.budget || "",
-            notes: c.notes || "",
-            ads: c.ads || [],
-            vehicles: c.vehicles || [],
-          });
-          setOpen(true);
-        } catch (e) {
-          console.warn("Invalid campaign:edit payload");
-        } finally {
-          localStorage.removeItem("campaign:edit");
-        }
+      } catch (e) {
+        console.warn("Invalid campaign:edit payload");
       }
     };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+
+    window.addEventListener("campaign:open", handleOpen);
+    window.addEventListener("campaign:edit", handleEdit);
+    return () => {
+      window.removeEventListener("campaign:open", handleOpen);
+      window.removeEventListener("campaign:edit", handleEdit);
+    };
   }, []);
 
   const canNext = useMemo(() => {

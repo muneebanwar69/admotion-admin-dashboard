@@ -37,10 +37,13 @@ export function AuthProvider({ children }) {
         throw new Error(`Too many login attempts. Please try again in ${remainingMins} minute${remainingMins > 1 ? 's' : ''}.`)
       }
 
-      // Check Firebase admins collection
+      // Check Firebase admins collection (login by username or email)
       const adminsRef = collection(db, 'admins')
-      const q = query(adminsRef, where('email', '==', username))
-      const querySnapshot = await getDocs(q)
+      const emailQuery = query(adminsRef, where('email', '==', username))
+      const usernameQuery = query(adminsRef, where('username', '==', username))
+      const emailSnapshot = await getDocs(emailQuery)
+      const usernameSnapshot = await getDocs(usernameQuery)
+      const querySnapshot = !emailSnapshot.empty ? emailSnapshot : usernameSnapshot
 
       if (!querySnapshot.empty) {
         const adminDoc = querySnapshot.docs[0]
@@ -68,7 +71,7 @@ export function AuthProvider({ children }) {
             uid: adminDoc.id,
             email: adminData.email,
             displayName: adminData.name,
-            username: adminData.email,
+            username: adminData.username || adminData.email,
             role: adminData.role,
             phoneNo: adminData.phoneNo,
             location: adminData.location,
@@ -96,10 +99,16 @@ export function AuthProvider({ children }) {
   // Logout function
   async function logout() {
     const userName = currentUser?.displayName || currentUser?.username || 'Admin'
-    // Log the logout activity before clearing user
-    await logUserLogout(userName)
+    
+    // Clear user immediately for responsive logout
     setCurrentUser(null)
     localStorage.removeItem('currentUser')
+    
+    // Log the logout activity (don't wait - fire and forget)
+    logUserLogout(userName).catch(err => {
+      console.warn('Failed to log logout activity:', err)
+    })
+    
     return Promise.resolve()
   }
 

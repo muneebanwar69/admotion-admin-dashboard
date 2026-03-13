@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(cd /d/fyp && python -c \"import ast; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('Python syntax OK'\\)\" 2>&1)"
+    ]
+  }
+}

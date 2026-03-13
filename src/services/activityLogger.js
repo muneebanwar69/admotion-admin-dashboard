@@ -1,5 +1,6 @@
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase'
+import logger from '../utils/logger'
 
 /**
  * Activity Logger Service
@@ -31,11 +32,11 @@ export const logActivity = async (type, action, details = {}, userName = 'Admin'
     }
 
     const docRef = await addDoc(activityCollection, activityLog)
-    console.log('✅ Activity logged successfully:', { id: docRef.id, type, action, userName })
+    logger.log('✅ Activity logged successfully:', { id: docRef.id, type, action, userName })
     return docRef.id
   } catch (error) {
-    console.error('❌ Error logging activity:', error)
-    console.error('Error details:', {
+    logger.error('❌ Error logging activity:', error)
+    logger.error('Error details:', {
       code: error.code,
       message: error.message,
       type,

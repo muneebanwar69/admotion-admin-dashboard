@@ -8,15 +8,13 @@ import { ToastProvider } from './contexts/ToastContext'
 import { UploadProvider } from './contexts/UploadContext'
 
 createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <ToastProvider>
-          <UploadProvider>
-            <App />
-          </UploadProvider>
-        </ToastProvider>
-      </ThemeProvider>
-    </BrowserRouter>
-  </React.StrictMode>
+  <BrowserRouter>
+    <ThemeProvider>
+      <ToastProvider>
+        <UploadProvider>
+          <App />
+        </UploadProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  </BrowserRouter>
 )

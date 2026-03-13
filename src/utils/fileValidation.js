@@ -25,6 +25,17 @@ export const validateFileSignature = async (file, expectedType) => {
           return
         }
 
+        // Special handling for MP4 where box size bytes can vary
+        if (expectedType === 'video/mp4') {
+          const hasFtypBox = bytes.length >= 8
+            && bytes[4] === 0x66
+            && bytes[5] === 0x74
+            && bytes[6] === 0x79
+            && bytes[7] === 0x70
+          resolve(hasFtypBox)
+          return
+        }
+
         // Check if file signature matches
         const matches = signature.every((byte, index) => bytes[index] === byte)
         resolve(matches)
@@ -86,7 +97,7 @@ export const validateFile = async (file) => {
   }
 
   // Validate file signature
-  const expectedType = isVideo ? 'video/mp4' : file.type
+  const expectedType = file.type
   const signatureValid = await validateFileSignature(file, expectedType)
   
   if (!signatureValid) {
