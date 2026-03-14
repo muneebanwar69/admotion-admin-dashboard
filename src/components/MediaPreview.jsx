@@ -1,9 +1,10 @@
 // src/components/MediaPreview.jsx
 import React from "react";
+import { createPortal } from "react-dom";
 
 export default function MediaPreview({ open, onClose, mediaUrl, mediaType, title }) {
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white rounded shadow-lg max-w-4xl w-full p-4">
         <div className="flex justify-between items-center mb-2">
@@ -21,6 +22,7 @@ export default function MediaPreview({ open, onClose, mediaUrl, mediaType, title
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,72 +1,48 @@
 rules_version = '2';
-// AdMotion - Firestore Security Rules
-// 
-// SECURITY NOTE: This configuration allows open read/write because the app uses
-// custom authentication (admins collection) instead of Firebase Auth.
-// 
-// RECOMMENDED FOR PRODUCTION:
-// 1. Migrate to Firebase Authentication
-// 2. Add authentication checks: request.auth != null
-// 3. Implement role-based access control
-// 4. Use Firebase Admin SDK for backend operations only
-//
-// TEMPORARY WORKAROUND: 
-// - Add validation rules to prevent malicious data
-// - Consider IP whitelisting at Firebase Console level
-// - Enable App Check for additional security layer
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to validate required fields
-    function hasRequiredFields(required) {
-      return request.resource.data.keys().hasAll(required);
-    }
-    
+
     // Ads Collection
     match /ads/{adId} {
-      // Allow read for vehicle app to display ads
       allow read: if true;
-      
-      // Write operations - allow all for development
-      // TODO: Add stricter validation in production
       allow create, update, delete: if true;
     }
-    
+
     // Vehicles Collection
     match /vehicles/{vehicleId} {
       allow read: if true;
-      
-      allow create: if hasRequiredFields(['vehicleName', 'driverName'])
-                    && request.resource.data.vehicleName is string;
-      
-      allow update, delete: if true;
+      allow create, update, delete: if true;
+
+      // Vehicle status subcollection (heartbeat data)
+      match /status/{statusId} {
+        allow read, write: if true;
+      }
     }
-    
-    // Activity Logs (append-only for audit trail)
+
+    // Activity Logs
     match /activityLogs/{logId} {
       allow read: if true;
-      // Allow create for logging - timestamp is added by server
       allow create: if true;
-      allow update, delete: if false; // Logs should not be modified
+      allow update, delete: if false;
     }
-    
-    // Admins Collection (sensitive - extra protection recommended)
+
+    // Admins Collection
     match /admins/{adminId} {
       allow read: if true;
-      
-      // Allow create for initial setup - tighten in production
-      allow create: if true;
-      
-      allow update: if true;
-      allow delete: if false; // Prevent accidental admin deletion
+      allow create, update: if true;
+      allow delete: if true;
     }
-    
+
     // Campaigns Collection
     match /campaigns/{campaignId} {
       allow read, write: if true;
     }
-    
+
+    // Impressions Collection
+    match /impressions/{impressionId} {
+      allow read, write: if true;
+    }
+
     // Assignments Collection
     match /assignments/{assignmentId} {
       allow read, write: if true;

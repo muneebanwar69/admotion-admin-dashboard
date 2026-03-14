@@ -307,7 +307,7 @@ const Layout = ({ children }) => {
         {/* Content area */}
         <main className='flex-1 w-full md:w-auto p-3 sm:p-4 md:p-6 transition-all duration-300'>
           {/* Card-like dashboard container to match screenshot */}
-          <div className='bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 rounded-lg md:rounded-xl shadow-lg border border-slate-200 overflow-hidden transition-colors duration-300'>
+          <div className='bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 rounded-lg md:rounded-xl shadow-lg border border-slate-200 transition-colors duration-300'>
             {children}
           </div>
         </main>

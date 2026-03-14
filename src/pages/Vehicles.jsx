@@ -216,6 +216,17 @@ const Vehicles = () => {
   const next = () => stepValid && setCurrentStep((s) => Math.min(3, s + 1));
   const back = () => setCurrentStep((s) => Math.max(1, s - 1));
 
+  // Convert a File to base64 string
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!file) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Save to Firestore
   const saveWizard = async () => {
     if (!validateStep1(step1) || !validateStep2(step2) || !validateStep3(step3)) {
@@ -226,13 +237,25 @@ const Vehicles = () => {
     setSaving(true);
 
     try {
+      // Convert document files to base64
+      const [cnicFrontBase64, cnicBackBase64, regDocBase64] = await Promise.all([
+        fileToBase64(step3.cnicFrontFile),
+        fileToBase64(step3.cnicBackFile),
+        fileToBase64(step3.regDocFile),
+      ]);
+
       const record = {
         carId, type: step1.type, vehicleName: step1.vehicleName, ownerName: step1.ownerName,
         model: step1.model, color: step1.color, cnic: step1.cnic, duration: step1.duration,
         registrationDate: step1.registrationDate, password: step1.password, status: "Active",
         owner: { firstName: step2.firstName, lastName: step2.lastName, cnic: step2.cnic, email: step2.email },
         bank: { accountTitle: step2.accountTitle, accountNo: step2.accountNo, iban: step2.iban, bankName: step2.bankName },
-        docs: { cnicFrontName: step3.cnicFrontName, cnicBackName: step3.cnicBackName, regDocName: step3.regDocName },
+        docs: {
+          cnicFrontName: step3.cnicFrontName, cnicBackName: step3.cnicBackName, regDocName: step3.regDocName,
+          ...(cnicFrontBase64 && { cnicFrontData: cnicFrontBase64 }),
+          ...(cnicBackBase64 && { cnicBackData: cnicBackBase64 }),
+          ...(regDocBase64 && { regDocData: regDocBase64 }),
+        },
       };
 
       const userName = currentUser?.displayName || currentUser?.username || 'Admin';

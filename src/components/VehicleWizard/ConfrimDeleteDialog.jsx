@@ -1,10 +1,11 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiAlertTriangle } from "react-icons/fi";
 import CloseButton from "../ui/CloseButton";
 
 const ConfirmDeleteDialog = ({ open, onConfirm, onCancel }) => {
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -52,7 +53,8 @@ const ConfirmDeleteDialog = ({ open, onConfirm, onCancel }) => {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

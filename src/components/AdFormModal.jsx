@@ -1,5 +1,6 @@
 // src/components/AdFormModal.jsx
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateVideoThumbnail } from "../utils/videoThumbnail";
 import CloseButton from "./ui/CloseButton";
@@ -103,7 +104,7 @@ export default function AdFormModal({
     await onSave(form, file, thumbnailBlob);
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -293,6 +294,7 @@ export default function AdFormModal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

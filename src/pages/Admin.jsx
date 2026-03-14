@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, Pencil, Trash2, Shield, Plus, X, AlertTriangle } from 'lucide-react'
+import { Upload, Pencil, Trash2, Shield, Plus, X, AlertTriangle, Users, Crown, UserCheck, Mail, Phone, MapPin, Lock, Eye } from 'lucide-react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
@@ -242,10 +243,66 @@ const Admin = () => {
             </div>
           </motion.div>
 
-          <motion.div 
+          {/* KPI Cards */}
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
+            {[
+              {
+                label: 'Total Admins',
+                count: admins.length,
+                icon: Users,
+                gradient: 'from-blue-500 to-blue-600',
+                bg: 'bg-blue-50 dark:bg-blue-900/20',
+                accent: 'bg-blue-500',
+                text: 'text-blue-700 dark:text-blue-300',
+                iconBg: 'bg-blue-100 dark:bg-blue-900/40',
+              },
+              {
+                label: 'Super Admins',
+                count: admins.filter(a => a.role === 'Super Admin').length,
+                icon: Crown,
+                gradient: 'from-purple-500 to-purple-600',
+                bg: 'bg-purple-50 dark:bg-purple-900/20',
+                accent: 'bg-purple-500',
+                text: 'text-purple-700 dark:text-purple-300',
+                iconBg: 'bg-purple-100 dark:bg-purple-900/40',
+              },
+              {
+                label: 'Regular Admins',
+                count: admins.filter(a => a.role === 'Admin').length,
+                icon: UserCheck,
+                gradient: 'from-emerald-500 to-emerald-600',
+                bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+                accent: 'bg-emerald-500',
+                text: 'text-emerald-700 dark:text-emerald-300',
+                iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
+              },
+            ].map((card, index) => (
+              <motion.div
+                key={card.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + index * 0.1 }}
+                whileHover={{ y: -4 }}
+                className={`relative overflow-hidden rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 ${card.bg} p-5 cursor-default`}
+              >
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${card.accent} rounded-l-2xl`} />
+                <div className='flex items-center justify-between'>
+                  <div>
+                    <p className='text-sm font-medium text-slate-500 dark:text-slate-400'>{card.label}</p>
+                    <p className={`text-3xl font-bold mt-1 ${card.text}`}>{card.count}</p>
+                  </div>
+                  <div className={`w-12 h-12 rounded-xl ${card.iconBg} flex items-center justify-center`}>
+                    <card.icon className={`w-6 h-6 ${card.text}`} />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.4 }}
             className='bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden'
           >
             <div className="overflow-x-auto">
@@ -282,10 +339,16 @@ const Admin = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className='hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-200 group'
+                        className='hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-brand-900 dark:hover:border-l-blue-500'
                       >
                         <td className='px-6 py-4'>
-                          <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-brand-900 to-brand-800 flex items-center justify-center overflow-hidden'>
+                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br from-brand-900 to-brand-800 flex items-center justify-center overflow-hidden ring-2 ring-offset-2 dark:ring-offset-slate-800 ${
+                            admin.role === 'Super Admin'
+                              ? 'ring-purple-500'
+                              : admin.role === 'Moderator'
+                                ? 'ring-amber-500'
+                                : 'ring-blue-500'
+                          }`}>
                             {admin.image ? (
                               <img src={admin.image} alt={admin.name} className='w-full h-full object-cover' />
                             ) : (
@@ -296,10 +359,12 @@ const Admin = () => {
                         <td className='px-6 py-4 text-sm font-medium text-slate-800 dark:text-slate-200'>{admin.name}</td>
                         <td className='px-6 py-4 text-sm text-slate-600 dark:text-slate-400'>{admin.email}</td>
                         <td className='px-6 py-4'>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            admin.role === 'Super Admin' 
-                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' 
-                              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${
+                            admin.role === 'Super Admin'
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                              : admin.role === 'Moderator'
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                                : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
                           }`}>
                             {admin.role}
                           </span>
@@ -376,63 +441,88 @@ const Admin = () => {
                 {/* Name */}
                 <div>
                   <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Name</label>
-                  <input
-                    type='text'
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder='Enter name'
-                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
-                  />
+                  <div className='relative'>
+                    <div className='absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none'>
+                      <Users className='w-4 h-4 text-blue-400' />
+                    </div>
+                    <input
+                      type='text'
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder='Enter name'
+                      className='w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                    />
+                  </div>
                 </div>
 
                 {/* E-mail */}
                 <div>
                   <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>E-mail</label>
-                  <input
-                    type='email'
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder='Enter email'
-                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
-                  />
+                  <div className='relative'>
+                    <div className='absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none'>
+                      <Mail className='w-4 h-4 text-cyan-400' />
+                    </div>
+                    <input
+                      type='email'
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder='Enter email'
+                      className='w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                    />
+                  </div>
                 </div>
 
                 {/* Phone No */}
                 <div>
                   <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Phone No</label>
-                  <input
-                    type='tel'
-                    value={formData.phoneNo}
-                    onChange={(e) => setFormData({ ...formData, phoneNo: e.target.value })}
-                    placeholder='0345-5098765'
-                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
-                  />
+                  <div className='relative'>
+                    <div className='absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none'>
+                      <Phone className='w-4 h-4 text-emerald-400' />
+                    </div>
+                    <input
+                      type='tel'
+                      value={formData.phoneNo}
+                      onChange={(e) => setFormData({ ...formData, phoneNo: e.target.value })}
+                      placeholder='0345-5098765'
+                      className='w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                    />
+                  </div>
                 </div>
 
                 {/* Role */}
                 <div>
                   <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Role</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
-                  >
-                    <option value='Admin'>Admin</option>
-                    <option value='Moderator'>Moderator</option>
-                    <option value='Super Admin'>Super Admin</option>
-                  </select>
+                  <div className='relative'>
+                    <div className='absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none'>
+                      <Shield className='w-4 h-4 text-purple-400' />
+                    </div>
+                    <select
+                      value={formData.role}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      className='w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                    >
+                      <option value='Admin'>Admin</option>
+                      <option value='Moderator'>Moderator</option>
+                      <option value='Super Admin'>Super Admin</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Location */}
                 <div>
                   <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>Location</label>
-                  <input
-                    type='text'
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder='Enter location'
-                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
-                  />
+                  <div className='relative'>
+                    <div className='absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none'>
+                      <MapPin className='w-4 h-4 text-rose-400' />
+                    </div>
+                    <input
+                      type='text'
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder='Enter location'
+                      className='w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                    />
+                  </div>
                 </div>
 
                 {/* Password */}
@@ -440,16 +530,21 @@ const Admin = () => {
                   <label className='block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2'>
                     Password {!editingAdmin && <span className='text-red-500'>*</span>}
                   </label>
-                  <input
-                    type='text'
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder={editingAdmin ? 'Current password shown' : 'Enter password'}
-                    className='w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-900 dark:focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
-                  />
+                  <div className='relative'>
+                    <div className='absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none'>
+                      <Lock className='w-4 h-4 text-amber-400' />
+                    </div>
+                    <input
+                      type='text'
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder={editingAdmin ? 'Current password shown' : 'Enter password'}
+                      className='w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300 text-slate-800 dark:text-slate-200'
+                    />
+                  </div>
                   <p className='text-xs text-slate-500 dark:text-slate-400 mt-2'>
-                    {editingAdmin 
-                      ? 'You can change the password by editing this field' 
+                    {editingAdmin
+                      ? 'You can change the password by editing this field'
                       : 'This password will be used for admin login'}
                   </p>
                 </div>
@@ -505,52 +600,55 @@ const Admin = () => {
         )}
       </AnimatePresence>
 
-      {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {deleteTarget && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'
-            onClick={() => setDeleteTarget(null)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className='bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700'
+      {/* Delete Confirmation Modal - rendered via portal to avoid overflow clipping */}
+      {createPortal(
+        <AnimatePresence>
+          {deleteTarget && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'
+              onClick={() => setDeleteTarget(null)}
             >
-              <div className='w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center'>
-                <Trash2 className='w-7 h-7 text-red-600 dark:text-red-400' />
-              </div>
-              <h3 className='text-xl font-bold text-slate-800 dark:text-slate-100 text-center mb-2'>Confirm Delete</h3>
-              <p className='text-slate-600 dark:text-slate-400 text-center mb-6'>
-                Are you sure you want to delete admin <span className='font-semibold text-slate-800 dark:text-slate-200'>"{deleteTarget.name}"</span>? This action cannot be undone.
-              </p>
-              <div className='flex gap-3'>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setDeleteTarget(null)}
-                  className='flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300'
-                >
-                  Cancel
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleDelete}
-                  className='flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300'
-                >
-                  Delete
-                </motion.button>
-              </div>
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className='bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700'
+              >
+                <div className='w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center'>
+                  <Trash2 className='w-7 h-7 text-red-600 dark:text-red-400' />
+                </div>
+                <h3 className='text-xl font-bold text-slate-800 dark:text-slate-100 text-center mb-2'>Confirm Delete</h3>
+                <p className='text-slate-600 dark:text-slate-400 text-center mb-6'>
+                  Are you sure you want to delete admin <span className='font-semibold text-slate-800 dark:text-slate-200'>"{deleteTarget.name}"</span>? This action cannot be undone.
+                </p>
+                <div className='flex gap-3'>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setDeleteTarget(null)}
+                    className='flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300'
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleDelete}
+                    className='flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300'
+                  >
+                    Delete
+                  </motion.button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }

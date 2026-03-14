@@ -6,10 +6,11 @@ import CampaignWizard from "../components/Campaigns/CampaignWizard/Index";
 import RealTimeIndicator from "../components/ui/RealTimeIndicator";
 import runAiNow, { getSchedulerStatus, getWeather } from "../services/scheduler";
 import { db } from "../firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, updateDoc, doc, serverTimestamp, deleteField } from "firebase/firestore";
+import { useToast } from "../contexts/ToastContext";
 import {
   Calendar, Cpu, CloudSun, Truck, Layers, Zap, Clock, RefreshCw, AlertCircle,
-  Sun, CloudRain, CloudSnow, Cloud, Play, Settings
+  Sun, CloudRain, CloudSnow, Cloud, Play, Settings, Trash2, CheckCircle
 } from "lucide-react";
 
 // Weather icon mapper
@@ -62,6 +63,11 @@ export default function SchedulingPage() {
   const [schedulingMode, setSchedulingMode] = useState("ai"); // "ai" or "manual"
   const [vehicles, setVehicles] = useState([]);
   const [ads, setAds] = useState([]);
+  const [selectedTestVehicle, setSelectedTestVehicle] = useState('');
+  const [selectedTestAd, setSelectedTestAd] = useState('');
+  const [testPushing, setTestPushing] = useState(false);
+  const [testClearing, setTestClearing] = useState(false);
+  const toast = useToast();
 
   const cities = ['Islamabad', 'Lahore', 'Karachi', 'Rawalpindi'];
 
@@ -110,6 +116,50 @@ export default function SchedulingPage() {
       console.error('AI scheduler run failed:', e);
     }
     setRunningAi(false);
+  };
+
+  const handlePushTestAd = async () => {
+    if (!selectedTestVehicle || !selectedTestAd) {
+      toast.warning('Please select both a vehicle and an ad');
+      return;
+    }
+    setTestPushing(true);
+    try {
+      await updateDoc(doc(db, "vehicles", selectedTestVehicle), {
+        assignedAds: [{
+          adId: selectedTestAd,
+          startTime: new Date().toISOString(),
+          endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          campaignId: 'test-mode',
+          assignedAt: new Date().toISOString()
+        }],
+        lastAssignmentUpdate: serverTimestamp()
+      });
+      toast.success('Ad pushed to vehicle successfully!');
+    } catch (e) {
+      console.error('Test mode push failed:', e);
+      toast.error('Failed to push ad to vehicle');
+    }
+    setTestPushing(false);
+  };
+
+  const handleClearTest = async () => {
+    if (!selectedTestVehicle) {
+      toast.warning('Please select a vehicle to clear');
+      return;
+    }
+    setTestClearing(true);
+    try {
+      await updateDoc(doc(db, "vehicles", selectedTestVehicle), {
+        assignedAds: deleteField(),
+        lastAssignmentUpdate: serverTimestamp()
+      });
+      toast.success('Test ads cleared from vehicle');
+    } catch (e) {
+      console.error('Test mode clear failed:', e);
+      toast.error('Failed to clear test ads');
+    }
+    setTestClearing(false);
   };
 
   const activeVehicles = vehicles.filter(v => v.status === 'Active').length;
@@ -334,6 +384,120 @@ export default function SchedulingPage() {
                   </motion.div>
                 );
               })}
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Quick Test Mode */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="mb-6"
+        >
+          <motion.div
+            whileHover={{ y: -2, transition: { duration: 0.2 } }}
+            className="relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-purple-200 dark:border-purple-800 p-6 transition-all duration-300 hover:shadow-2xl"
+          >
+            {/* Purple gradient accent */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500" />
+            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-purple-500/5 to-transparent rounded-bl-full pointer-events-none" />
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-purple-500/30">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Quick Test Mode</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Instantly push an ad to a vehicle without waiting for the AI scheduler</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              {/* Vehicle Selector */}
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Select Vehicle</label>
+                <select
+                  value={selectedTestVehicle}
+                  onChange={(e) => setSelectedTestVehicle(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                >
+                  <option value="">-- Choose a vehicle --</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.plateNumber || v.licensePlate || v.id} {v.driverName ? `- ${v.driverName}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ad Selector */}
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Select Ad</label>
+                <select
+                  value={selectedTestAd}
+                  onChange={(e) => setSelectedTestAd(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                >
+                  <option value="">-- Choose an ad --</option>
+                  {ads.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.title || a.name || a.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Push Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handlePushTestAd}
+                disabled={testPushing || !selectedTestVehicle || !selectedTestAd}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+                  testPushing || !selectedTestVehicle || !selectedTestAd
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40'
+                }`}
+              >
+                {testPushing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Pushing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Push Ad to Vehicle
+                  </>
+                )}
+              </motion.button>
+
+              {/* Clear Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleClearTest}
+                disabled={testClearing || !selectedTestVehicle}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+                  testClearing || !selectedTestVehicle
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-white dark:bg-slate-700 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700'
+                }`}
+              >
+                {testClearing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Clearing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Clear Test
+                  </>
+                )}
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>

@@ -1,9 +1,10 @@
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiAlertTriangle } from "react-icons/fi";
 import CloseButton from "./ui/CloseButton";
 
 const ConfirmDeleteDialog = ({ open, onCancel, onConfirm, title = "Are you sure?", message = "This action cannot be undone." }) => {
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -51,7 +52,8 @@ const ConfirmDeleteDialog = ({ open, onCancel, onConfirm, title = "Are you sure?
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

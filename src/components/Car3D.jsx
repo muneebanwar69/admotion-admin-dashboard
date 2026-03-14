@@ -509,15 +509,17 @@ const Car3DScene = ({ status = 'idle', onAnimationComplete, modelPath = '/car_mo
   const carPos = [0, -0.5, 0]
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full" style={{ pointerEvents: 'none' }}>
       <Canvas
         shadows
+        style={{ pointerEvents: 'none' }}
         gl={{
           alpha: true,
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.2
         }}
+        events={() => ({ enabled: false, priority: 0, compute: () => {} })}
       >
         <PerspectiveCamera makeDefault position={[6, 2.5, 7]} fov={42} />
 
@@ -575,10 +577,11 @@ const Car3DScene = ({ status = 'idle', onAnimationComplete, modelPath = '/car_mo
         <AtmosphericParticles status={status} />
         <NeonGround status={status} />
 
-        {/* Camera Controls */}
+        {/* Camera Controls - interaction disabled so it doesn't block login form */}
         <OrbitControls
           enableZoom={false}
           enablePan={false}
+          enableRotate={false}
           maxPolarAngle={Math.PI / 2}
           minPolarAngle={Math.PI / 6}
           autoRotate={status === 'idle'}

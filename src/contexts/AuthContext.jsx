@@ -116,14 +116,18 @@ export function AuthProvider({ children }) {
     // Check for stored user on app load
     const storedUser = localStorage.getItem('currentUser')
     if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser))
+      try {
+        setCurrentUser(JSON.parse(storedUser))
+      } catch (e) {
+        localStorage.removeItem('currentUser')
+      }
     }
     setLoading(false)
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user)
-      }
+    // Listen to Firebase Auth state but don't overwrite our custom Firestore user
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      // Firebase Auth state is tracked but we use our own Firestore-based user object
+      // stored in localStorage, so we intentionally don't call setCurrentUser here
     })
 
     return unsubscribe

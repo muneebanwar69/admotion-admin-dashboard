@@ -1,5 +1,6 @@
 // src/components/Campaigns/CampaignWizard/Index.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Step1Basic from "./Step1Basic";
 import Step2AssignAds from "./Step2AssignAds";
@@ -128,8 +129,8 @@ export default function CampaignWizard() {
         });
         setStep(0);
         setOpen(true);
-      } catch (e) {
-        console.warn("Invalid campaign:edit payload");
+      } catch (err) {
+        console.warn("Invalid campaign:edit payload", err);
       }
     };
 
@@ -242,7 +243,8 @@ export default function CampaignWizard() {
     }
   };
 
-  return (
+  // Use portal to render modals at document.body level, avoiding overflow/transform clipping
+  return createPortal(
     <>
       <AnimatePresence>
         {open && (
@@ -296,17 +298,19 @@ export default function CampaignWizard() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={onNext}
-                    disabled={!canNext}
-                    className={`px-5 py-2.5 rounded-lg transition-all duration-200 font-semibold ${
-                      canNext
-                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30"
-                        : "bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                    }`}
-                  >
-                    Next
-                  </button>
+                  {step < STEPS.length - 1 && (
+                    <button
+                      onClick={onNext}
+                      disabled={!canNext}
+                      className={`px-5 py-2.5 rounded-lg transition-all duration-200 font-semibold ${
+                        canNext
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30"
+                          : "bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      Next
+                    </button>
+                  )}
                   {step === STEPS.length - 1 && (
                     <button
                       onClick={onSubmit}
@@ -323,13 +327,14 @@ export default function CampaignWizard() {
         )}
       </AnimatePresence>
 
-      {/* ✅ Notification modal */}
+      {/* Notification modal */}
       <NotifyModal
         open={notify.open}
         title={notify.title}
         message={notify.message}
         onClose={() => setNotify({ open: false, title: "", message: "" })}
       />
-    </>
+    </>,
+    document.body
   );
 }

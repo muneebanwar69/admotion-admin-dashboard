@@ -1,5 +1,6 @@
 // src/components/Campaigns/CampaignList.jsx
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlusCircle, Pencil, Trash2, PlayCircle, Rocket } from "lucide-react";
 import { db } from "../../firebase";
@@ -25,7 +26,7 @@ import { EmptyCampaigns } from "../ui/EmptyState";
  * Enhanced Custom Modal Component with animations
  */
 function ConfirmModal({ open, title, message, onConfirm, onCancel }) {
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -65,7 +66,8 @@ function ConfirmModal({ open, title, message, onConfirm, onCancel }) {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

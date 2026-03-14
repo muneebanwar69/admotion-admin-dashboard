@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers, LayoutGrid, List } from "lucide-react";
+import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers, LayoutGrid, List, CheckCircle, DollarSign, Film } from "lucide-react";
 import RealTimeIndicator from "../components/ui/RealTimeIndicator";
 import { db } from "../firebase";
 import {
@@ -326,6 +327,72 @@ const Ads = () => {
             </div>
           </motion.div>
 
+          {/* KPI Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[
+              {
+                label: 'Total Ads',
+                value: ads.length,
+                icon: Layers,
+                gradientFrom: 'from-blue-500',
+                gradientTo: 'to-indigo-600',
+                iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
+                accentFrom: 'from-blue-500',
+                accentTo: 'to-indigo-600',
+              },
+              {
+                label: 'Active Ads',
+                value: ads.filter((a) => a.status === 'Active').length,
+                icon: CheckCircle,
+                gradientFrom: 'from-green-500',
+                gradientTo: 'to-emerald-600',
+                iconBg: 'bg-gradient-to-br from-green-500 to-emerald-600',
+                accentFrom: 'from-green-500',
+                accentTo: 'to-emerald-600',
+              },
+              {
+                label: 'Total Budget',
+                value: `PKR ${ads.reduce((sum, a) => sum + (parseFloat(a.budget) || 0), 0).toLocaleString()}`,
+                icon: DollarSign,
+                gradientFrom: 'from-amber-500',
+                gradientTo: 'to-yellow-500',
+                iconBg: 'bg-gradient-to-br from-amber-500 to-yellow-500',
+                accentFrom: 'from-amber-500',
+                accentTo: 'to-yellow-500',
+              },
+              {
+                label: 'Video Ads',
+                value: ads.filter((a) => a.type === 'Video').length,
+                icon: Film,
+                gradientFrom: 'from-purple-500',
+                gradientTo: 'to-violet-600',
+                iconBg: 'bg-gradient-to-br from-purple-500 to-violet-600',
+                accentFrom: 'from-purple-500',
+                accentTo: 'to-violet-600',
+              },
+            ].map((card, index) => (
+              <motion.div
+                key={card.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1, duration: 0.4 }}
+                whileHover={{ y: -4 }}
+                className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-5 overflow-hidden hover:shadow-2xl transition-shadow duration-300"
+              >
+                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${card.accentFrom} ${card.accentTo}`} />
+                <div className="flex items-center gap-4">
+                  <div className={`${card.iconBg} p-3 rounded-xl text-white shadow-lg`}>
+                    <card.icon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{card.value}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{card.label}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
           {/* Search Filter + View Toggle */}
           <div className="mb-4 flex items-center gap-3">
             <div className="relative flex-1">
@@ -602,7 +669,8 @@ const Ads = () => {
         </div>
       )}
 
-      {/* FORM MODAL */}
+      {/* FORM MODAL - rendered via portal to avoid overflow clipping */}
+      {createPortal(
       <AnimatePresence>
         {showForm && (
           <motion.div
@@ -874,9 +942,12 @@ const Ads = () => {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal - rendered via portal */}
+      {createPortal(
       <AnimatePresence>
         {deleteTarget && (
           <motion.div
@@ -918,7 +989,9 @@ const Ads = () => {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </motion.div>
   );
 };
