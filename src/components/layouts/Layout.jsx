@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, LogOut, BarChart3, Bell, User, Truck, LayoutDashboard, Layers, Sun, Moon, Shield, CalendarClock, ChevronRight, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { Menu, LogOut, BarChart3, Bell, User, Truck, LayoutDashboard, Layers, Sun, Moon, Shield, CalendarClock, ChevronRight, PanelLeftClose, PanelLeft, FileText, Settings } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -19,6 +19,8 @@ const navItems = [
   { to: '/alerts', label: 'Alerts Management', icon: <Bell size={20} /> },
   { to: '/my-profile', label: 'My Profile', icon: <User size={20} /> },
   { to: '/admin', label: 'Admin Management', icon: <Shield size={20} /> },
+  { to: '/vehicle-reports', label: 'Vehicle Reports', icon: <FileText size={20} /> },
+  { to: '/report-settings', label: 'Report Settings', icon: <Settings size={20} /> },
 ]
 
 const Layout = ({ children }) => {

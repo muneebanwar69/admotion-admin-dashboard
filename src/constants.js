@@ -17,14 +17,18 @@ export const COLLECTIONS = {
   ADMINS: 'admins',
   ACTIVITY_LOGS: 'activityLogs',
   CAMPAIGNS: 'campaigns',
-  USERS: 'users'
+  USERS: 'users',
+  DRIVERS: 'drivers',
+  DRIVER_EARNINGS: 'driverEarnings',
+  DRIVER_ALERTS: 'driverAlerts'
 }
 
 // User Roles
 export const ROLES = {
   SUPER_ADMIN: 'Super Admin',
   ADMIN: 'Admin',
-  USER: 'User'
+  USER: 'User',
+  DRIVER: 'Driver'
 }
 
 // Vehicle Status

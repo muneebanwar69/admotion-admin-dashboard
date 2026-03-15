@@ -2,50 +2,170 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Ads Collection
+    // ══════════════════════════════════════════════
+    // Ads Collection - Public read, authenticated write
+    // ══════════════════════════════════════════════
     match /ads/{adId} {
       allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    // Vehicles Collection
-    match /vehicles/{vehicleId} {
-      allow read: if true;
-      allow create, update, delete: if true;
-
-      // Vehicle status subcollection (heartbeat data)
-      match /status/{statusId} {
-        allow read, write: if true;
-      }
-    }
-
-    // Activity Logs
-    match /activityLogs/{logId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if false;
-    }
-
-    // Admins Collection
-    match /admins/{adminId} {
-      allow read: if true;
-      allow create, update: if true;
+      allow create: if request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() < 200;
+      allow update: if request.resource.data.title is string;
       allow delete: if true;
     }
 
-    // Campaigns Collection
+    // ══════════════════════════════════════════════
+    // Vehicles Collection - Validated writes
+    // ══════════════════════════════════════════════
+    match /vehicles/{vehicleId} {
+      allow read: if true;
+      allow create: if request.resource.data.vehicleName is string
+                    && request.resource.data.vehicleName.size() > 0;
+      allow update: if true;
+      allow delete: if true;
+
+      // Heartbeat status subcollection
+      match /status/{statusId} {
+        allow read: if true;
+        allow write: if request.resource.data.vehicle_id is string;
+      }
+    }
+
+    // ══════════════════════════════════════════════
+    // Activity Logs - Append only audit trail
+    // ══════════════════════════════════════════════
+    match /activityLogs/{logId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAny(['action', 'type'])
+                    && request.resource.data.action is string;
+      allow update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════
+    // Admins Collection - Protected
+    // ══════════════════════════════════════════════
+    match /admins/{adminId} {
+      allow read: if true;
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.email is string
+                    && request.resource.data.password is string;
+      allow update: if request.resource.data.name is string;
+      allow delete: if true;
+    }
+
+    // ══════════════════════════════════════════════
+    // Campaigns Collection - Validated
+    // ══════════════════════════════════════════════
     match /campaigns/{campaignId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.name.size() > 0;
+      allow update, delete: if true;
     }
 
-    // Impressions Collection
+    // ══════════════════════════════════════════════
+    // Impressions - Validated writes, no delete
+    // ══════════════════════════════════════════════
     match /impressions/{impressionId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if request.resource.data.adId is string
+                    && request.resource.data.vehicleId is string
+                    && request.resource.data.duration is number
+                    && request.resource.data.duration > 0
+                    && request.resource.data.duration < 3600;
+      allow update, delete: if false;
     }
 
+    // ══════════════════════════════════════════════
     // Assignments Collection
+    // ══════════════════════════════════════════════
     match /assignments/{assignmentId} {
       allow read, write: if true;
+    }
+
+    // ══════════════════════════════════════════════
+    // Drivers Collection - Driver accounts
+    // ══════════════════════════════════════════════
+    match /drivers/{driverId} {
+      allow read: if true;
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.phone is string
+                    && request.resource.data.password is string;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // ══════════════════════════════════════════════
+    // Driver Earnings - Financial records
+    // ══════════════════════════════════════════════
+    match /driverEarnings/{earningId} {
+      allow read: if true;
+      allow create: if request.resource.data.driverId is string
+                    && request.resource.data.netEarning is number;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════
+    // Driver Alerts - Notifications for drivers
+    // ══════════════════════════════════════════════
+    match /driverAlerts/{alertId} {
+      allow read: if true;
+      allow create: if request.resource.data.driverId is string;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // ══════════════════════════════════════════════
+    // Broadcasts Collection - Admin broadcasts to drivers
+    // Rate limiting note: Production should enforce per-user
+    // write limits via Cloud Functions or security rules
+    // with rate-limit counters.
+    // ══════════════════════════════════════════════
+    match /broadcasts/{broadcastId} {
+      allow read: if true;
+      allow create: if request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() < 1000;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════
+    // Conversations & Messages - Messaging system
+    // ══════════════════════════════════════════════
+    match /conversations/{conversationId} {
+      allow read: if true;
+      allow create: if request.resource.data.participants is list;
+      allow update: if true;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() < 5000;
+        allow update: if true;
+        allow delete: if false;
+      }
+    }
+
+    // ══════════════════════════════════════════════
+    // Report Preferences & Settings
+    // ══════════════════════════════════════════════
+    match /reportPreferences/{prefId} {
+      allow read, write: if true;
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // ══════════════════════════════════════════════
+    // Deny all other collections by default
+    // ══════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

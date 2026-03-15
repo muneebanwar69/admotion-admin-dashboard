@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers, LayoutGrid, List, CheckCircle, DollarSign, Film } from "lucide-react";
+import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers, LayoutGrid, List, CheckCircle, DollarSign, Film, Type, Tag, Building2, Calendar, Activity, MapPin, Image as ImageIcon, Mail, Phone, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import RealTimeIndicator from "../components/ui/RealTimeIndicator";
 import { db } from "../firebase";
 import {
@@ -41,6 +41,7 @@ const Ads = () => {
   const { currentUser } = useAuth();
   const { startUpload, isUploading } = useUpload();
   const [ads, setAds] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingAd, setEditingAd] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
@@ -48,6 +49,7 @@ const Ads = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState("table"); // "table" or "cards"
+  const [formStep, setFormStep] = useState(1);
 
   const [formData, setFormData] = useState({
     adId: "",
@@ -116,9 +118,15 @@ const Ads = () => {
           }
         );
 
+        const unsubVehicles = onSnapshot(collection(db, 'vehicles'), (snapshot) => {
+          if (!isActive) return;
+          setVehicles(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
         return () => {
           isActive = false;
           unsubscribe?.();
+          unsubVehicles?.();
         };
       } catch (err) {
         console.error('Failed to set up listener:', err);
@@ -136,7 +144,7 @@ const Ads = () => {
   // Open new ad form
   const handleNewAd = () => {
     setFormData({
-      adId: `Ad ${String(ads.length + 1).padStart(2, "0")}`,
+      adId: `AD-${String(ads.length + 1).padStart(4, "0")}`,
       title: "",
       category: "",
       company: "",
@@ -159,6 +167,7 @@ const Ads = () => {
     });
     setPreviewFile(null);
     setEditingAd(null);
+    setFormStep(1);
     setShowForm(true);
   };
 
@@ -173,6 +182,7 @@ const Ads = () => {
     });
     setPreviewFile(null);
     setEditingAd(ad.docId);
+    setFormStep(1);
     setShowForm(true);
   };
 
@@ -274,6 +284,27 @@ const Ads = () => {
       }
     });
   };
+
+  // Check if an ad is actually playing on an active display
+  const isAdPlaying = (adId) => {
+    return vehicles.some(v => {
+      const isScreenActive = (() => {
+        const ts = v.lastSeen
+        if (!ts) return false
+        const date = ts.toDate ? ts.toDate() : new Date(ts)
+        return (new Date() - date) / 1000 < 300
+      })()
+      if (!isScreenActive) return false
+      return v.assignedAds?.some(a => a.adId === adId)
+    })
+  }
+
+  // Get effective status based on whether ad is playing on a live display
+  const getEffectiveStatus = (ad) => {
+    if (isAdPlaying(ad.docId || ad.id)) return 'Active'
+    if (ad.status === 'Active') return 'Inactive' // marked active but not playing
+    return ad.status // Pending, Expired stay as-is
+  }
 
   // Filter ads based on search query
   const filteredAds = ads.filter((ad) => {
@@ -471,22 +502,24 @@ const Ads = () => {
                         <Layers className="w-10 h-10 text-slate-400 dark:text-slate-500" />
                       )}
                       <div className="absolute top-2 right-2">
+                        {(() => { const effectiveStatus = getEffectiveStatus(ad); return (
                         <motion.span
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            ad.status === 'Active'
+                            effectiveStatus === 'Active'
                               ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-400/50'
-                              : ad.status === 'Pending'
+                              : effectiveStatus === 'Pending'
                               ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-lg shadow-yellow-400/50'
-                              : ad.status === 'Expired'
+                              : effectiveStatus === 'Expired'
                               ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
                               : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-400/50'
                           }`}
                         >
                           <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                          {ad.status || 'N/A'}
+                          {effectiveStatus}
                         </motion.span>
+                        ); })()}
                       </div>
                     </div>
                     {/* Card body */}
@@ -589,15 +622,16 @@ const Ads = () => {
                     <td className="px-4 py-2 dark:text-slate-300">{ad.start}</td>
                     <td className="px-4 py-2 dark:text-slate-300">{ad.end}</td>
                     <td className="px-4 py-2">
+                      {(() => { const effectiveStatus = getEffectiveStatus(ad); return (
                       <motion.span
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                          ad.status === 'Active'
+                          effectiveStatus === 'Active'
                             ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-400/50'
-                            : ad.status === 'Pending'
+                            : effectiveStatus === 'Pending'
                             ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-lg shadow-yellow-400/50'
-                            : ad.status === 'Expired'
+                            : effectiveStatus === 'Expired'
                             ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
                             : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-400/50'
                         }`}
@@ -607,8 +641,9 @@ const Ads = () => {
                           transition={{ duration: 2, repeat: Infinity }}
                           className="w-2 h-2 bg-white rounded-full"
                         />
-                        {ad.status}
+                        {effectiveStatus}
                       </motion.span>
+                      ); })()}
                     </td>
                     <td className="px-4 py-2 dark:text-slate-100">{ad.location}</td>
                     <td className="px-4 py-2 dark:text-slate-100">{ad.type}</td>
@@ -686,16 +721,31 @@ const Ads = () => {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl p-6 w-full max-w-3xl border border-slate-200 dark:border-slate-700 transition-all duration-300 my-auto"
+              className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl w-full max-w-3xl border border-slate-200 dark:border-slate-700 transition-all duration-300 my-auto overflow-hidden"
             >
+              {/* Gradient accent bar */}
+              <div className="h-1.5 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600" />
+
+              <div className="p-6">
+              {/* Form header */}
               <div className="flex items-center justify-between mb-6">
-                <motion.h2
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="text-xl font-bold text-slate-800 dark:text-slate-100"
-                >
-                  {editingAd ? "Edit Ad" : "Add New Ad"}
-                </motion.h2>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <motion.h2
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xl font-bold text-slate-800 dark:text-slate-100"
+                    >
+                      {editingAd ? "Edit Ad" : "Add New Ad"}
+                    </motion.h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {editingAd ? "Update ad details below" : "Fill in the details to create a new ad"}
+                    </p>
+                  </div>
+                </div>
                 <motion.button
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
@@ -706,238 +756,465 @@ const Ads = () => {
                 </motion.button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Title</label>
-                  <input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Category */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Category</label>
-                  <input type="text" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Company */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Company</label>
-                  <input type="text" value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Budget */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Budget</label>
-                  <input type="text" value={formData.budget} onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Start Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Start Date</label>
-                  <input type="date" value={formData.start} onChange={(e) => setFormData({ ...formData, start: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* End Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">End Date</label>
-                  <input type="date" value={formData.end} onChange={(e) => setFormData({ ...formData, end: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Status - Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Status</label>
-                  <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800">
-                    <option value="">Select Status</option>
-                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-
-                {/* Location - City Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Location (City)</label>
-                  <select value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value, targetAreas: [] })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800">
-                    <option value="">Select City</option>
-                    {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                {/* Type */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Type</label>
-                  <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800">
-                    <option>Image</option>
-                    <option>Video</option>
-                  </select>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Email</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Contact */}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Contact</label>
-                  <input type="text" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
-                </div>
-
-                {/* Time Slots - Multi-select checkboxes */}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Time Slots</label>
-                  <div className="flex flex-wrap gap-2">
-                    {TIME_SLOTS.map(slot => (
-                      <motion.button
-                        key={slot}
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => toggleMultiSelect('timeSlots', slot)}
-                        className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-all duration-200 ${
-                          (formData.timeSlots || []).includes(slot)
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-400/30'
-                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-blue-400'
+              {/* Step indicator */}
+              <div className="flex items-center justify-between mb-6 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                {[
+                  { num: 1, label: 'Ad Details', color: 'blue' },
+                  { num: 2, label: 'Targeting', color: 'purple' },
+                  { num: 3, label: 'Upload Media', color: 'indigo' },
+                ].map((step, idx) => (
+                  <React.Fragment key={step.num}>
+                    {idx > 0 && (
+                      <div className={`flex-1 h-0.5 mx-2 rounded-full transition-all duration-500 ${formStep > idx ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (step.num < formStep) setFormStep(step.num);
+                      }}
+                      className="flex items-center gap-2 group"
+                    >
+                      <motion.div
+                        animate={formStep === step.num ? { scale: [1, 1.1, 1] } : {}}
+                        transition={{ duration: 0.4 }}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                          formStep > step.num
+                            ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white shadow-lg shadow-green-400/30'
+                            : formStep === step.num
+                            ? step.color === 'blue'
+                              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-400/40'
+                              : step.color === 'purple'
+                              ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-400/40'
+                              : 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-400/40'
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                         }`}
                       >
-                        {slot}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
+                        {formStep > step.num ? <Check className="w-4 h-4" /> : step.num}
+                      </motion.div>
+                      <span className={`text-xs font-semibold hidden sm:block transition-colors duration-300 ${
+                        formStep === step.num
+                          ? step.color === 'blue'
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : step.color === 'purple'
+                            ? 'text-purple-600 dark:text-purple-400'
+                            : 'text-indigo-600 dark:text-indigo-400'
+                          : formStep > step.num
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-slate-400 dark:text-slate-500'
+                      }`}>
+                        {step.label}
+                      </span>
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
 
-                {/* Weather Targets - Multi-select */}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Weather Targets</label>
-                  <div className="flex flex-wrap gap-2">
-                    {WEATHER_TARGETS.map(weather => (
-                      <motion.button
-                        key={weather}
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => toggleMultiSelect('weatherTargets', weather)}
-                        className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-all duration-200 ${
-                          (formData.weatherTargets || []).includes(weather)
-                            ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-400/30'
-                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-amber-400'
-                        }`}
-                      >
-                        {weather}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
+              {/* Step content with animations */}
+              <div className="min-h-[320px] overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {/* STEP 1: Ad Details */}
+                  {formStep === 1 && (
+                    <motion.div
+                      key="step1"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="grid grid-cols-2 gap-4"
+                    >
+                      {/* Title */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Title <span className="text-red-500">*</span></label>
+                        <div className="relative">
+                          <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <input type="text" placeholder="Enter ad title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
+                        </div>
+                      </div>
 
-                {/* Target Areas - Based on selected city */}
-                {availableAreas.length > 0 && (
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Target Areas in {formData.location}</label>
-                    <div className="flex flex-wrap gap-2">
-                      {availableAreas.map(area => (
-                        <motion.button
-                          key={area}
-                          type="button"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => toggleMultiSelect('targetAreas', area)}
-                          className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-all duration-200 ${
-                            (formData.targetAreas || []).includes(area)
-                              ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-400/30'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-purple-400'
-                          }`}
-                        >
-                          {area}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      {/* Category */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Category</label>
+                        <div className="relative">
+                          <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <input type="text" placeholder="e.g. Food, Tech, Fashion" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
+                        </div>
+                      </div>
 
-                {/* File Upload */}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                    Upload Attachment
-                  </label>
-                  <label className="flex items-center gap-2 bg-brand-900 text-white px-4 py-2 rounded-xl cursor-pointer hover:bg-brand-800 w-fit transition-all duration-200 transform hover:scale-105">
-                    <Upload size={18} />
-                    Choose File
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
+                      {/* Company */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Company <span className="text-red-500">*</span></label>
+                        <div className="relative">
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <input type="text" placeholder="Company name" value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
+                        </div>
+                      </div>
 
-                  {formData.preview && (
-                    <div className="mt-3 relative inline-block">
-                      {formData.type === "Image" ? (
-                        <img
-                          src={formData.preview}
-                          alt="Preview"
-                          className="h-32 w-32 object-cover rounded-xl border dark:border-slate-600"
-                        />
-                      ) : (
-                        <video
-                          src={formData.preview}
-                          controls
-                          className="h-32 w-32 rounded-xl border dark:border-slate-600"
-                        />
+                      {/* Budget */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Budget</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <input type="text" placeholder="e.g. 50000" value={formData.budget} onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
+                        </div>
+                      </div>
+
+                      {/* Start Date */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Start Date</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                          <input type="date" min={new Date().toISOString().split('T')[0]} value={formData.start} onChange={(e) => setFormData({ ...formData, start: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 [&::-webkit-calendar-picker-indicator]:dark:invert" />
+                        </div>
+                      </div>
+
+                      {/* End Date */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">End Date</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                          <input type="date" min={formData.start || new Date().toISOString().split('T')[0]} value={formData.end} onChange={(e) => setFormData({ ...formData, end: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 [&::-webkit-calendar-picker-indicator]:dark:invert" />
+                        </div>
+                      </div>
+
+                      {/* Email - col-span-2 */}
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Email</label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <input type="email" placeholder="advertiser@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
+                        </div>
+                      </div>
+
+                      {/* Contact - col-span-2 */}
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Contact</label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <input type="text" placeholder="+92 300 1234567" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl p-2 transition-all duration-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* STEP 2: Targeting */}
+                  {formStep === 2 && (
+                    <motion.div
+                      key="step2"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="space-y-5"
+                    >
+                      {/* Location - City Dropdown */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Location (City) <span className="text-red-500">*</span></label>
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                          <select value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value, targetAreas: [] })}
+                            className="w-full pl-10 pr-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-2 transition-all duration-200 hover:border-purple-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 appearance-none">
+                            <option value="">Select City</option>
+                            {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Type - Toggle Cards */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Type</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setFormData({ ...formData, type: 'Image' })}
+                            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-300 ${
+                              formData.type === 'Image'
+                                ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/40 dark:to-purple-900/30 shadow-lg shadow-purple-400/20'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}
+                          >
+                            <div className={`p-3 rounded-xl transition-all duration-300 ${
+                              formData.type === 'Image'
+                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-md'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                            }`}>
+                              <ImageIcon className="w-6 h-6" />
+                            </div>
+                            <span className={`text-sm font-semibold ${formData.type === 'Image' ? 'text-purple-700 dark:text-purple-300' : 'text-slate-500 dark:text-slate-400'}`}>Image</span>
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setFormData({ ...formData, type: 'Video' })}
+                            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-300 ${
+                              formData.type === 'Video'
+                                ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/40 dark:to-purple-900/30 shadow-lg shadow-purple-400/20'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}
+                          >
+                            <div className={`p-3 rounded-xl transition-all duration-300 ${
+                              formData.type === 'Video'
+                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-md'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                            }`}>
+                              <Film className="w-6 h-6" />
+                            </div>
+                            <span className={`text-sm font-semibold ${formData.type === 'Video' ? 'text-purple-700 dark:text-purple-300' : 'text-slate-500 dark:text-slate-400'}`}>Video</span>
+                          </motion.button>
+                        </div>
+                      </div>
+
+                      {/* Time Slots */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Time Slots</label>
+                        <div className="flex flex-wrap gap-2">
+                          {TIME_SLOTS.map(slot => (
+                            <motion.button
+                              key={slot}
+                              type="button"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => toggleMultiSelect('timeSlots', slot)}
+                              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all duration-200 ${
+                                (formData.timeSlots || []).includes(slot)
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-400/30'
+                                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-blue-400'
+                              }`}
+                            >
+                              {slot}
+                            </motion.button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Weather Targets */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Weather Targets</label>
+                        <div className="flex flex-wrap gap-2">
+                          {WEATHER_TARGETS.map(weather => (
+                            <motion.button
+                              key={weather}
+                              type="button"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => toggleMultiSelect('weatherTargets', weather)}
+                              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all duration-200 ${
+                                (formData.weatherTargets || []).includes(weather)
+                                  ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-400/30'
+                                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-amber-400'
+                              }`}
+                            >
+                              {weather}
+                            </motion.button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Target Areas */}
+                      {availableAreas.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">Target Areas in {formData.location}</label>
+                          <div className="flex flex-wrap gap-2">
+                            {availableAreas.map(area => (
+                              <motion.button
+                                key={area}
+                                type="button"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => toggleMultiSelect('targetAreas', area)}
+                                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all duration-200 ${
+                                  (formData.targetAreas || []).includes(area)
+                                    ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-400/30'
+                                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-purple-400'
+                                }`}
+                              >
+                                {area}
+                              </motion.button>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                      <button
-                        onClick={removePreview}
-                        className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full hover:bg-red-700 transition-all duration-200 transform hover:scale-110"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
+                    </motion.div>
+                  )}
+
+                  {/* STEP 3: Upload Media */}
+                  {formStep === 3 && (
+                    <motion.div
+                      key="step3"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="flex flex-col items-center justify-center"
+                    >
+                      {!formData.preview ? (
+                        <label className="group block cursor-pointer w-full">
+                          <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all duration-300">
+                            <div className="flex flex-col items-center gap-4">
+                              <motion.div
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                                className="p-5 rounded-full bg-slate-100 dark:bg-slate-700 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors"
+                              >
+                                <Upload className="w-10 h-10 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                              </motion.div>
+                              <div>
+                                <p className="text-base font-semibold text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                  Click to upload or drag and drop
+                                </p>
+                                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                                  Images (JPG, PNG, GIF) or Videos (MP4, MOV) - Max 20MB
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handleFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                      ) : (
+                        <div className="w-full border-2 border-green-300 dark:border-green-700 rounded-2xl p-6 bg-green-50/50 dark:bg-green-950/20">
+                          <div className="flex flex-col items-center gap-4">
+                            {/* Large Preview */}
+                            <div className="relative">
+                              {formData.type === "Image" ? (
+                                <img
+                                  src={formData.preview}
+                                  alt="Preview"
+                                  className="max-h-56 max-w-full object-contain rounded-xl border-2 border-green-200 dark:border-green-700 shadow-lg"
+                                />
+                              ) : (
+                                <video
+                                  src={formData.preview}
+                                  controls
+                                  className="max-h-56 max-w-full rounded-xl border-2 border-green-200 dark:border-green-700 shadow-lg"
+                                />
+                              )}
+                              <button
+                                onClick={removePreview}
+                                className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700 transition-all duration-200 shadow-lg hover:scale-110"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                            {/* File info */}
+                            <div className="text-center">
+                              <div className="flex items-center justify-center gap-2 mb-2">
+                                <CheckCircle className="w-5 h-5 text-green-500" />
+                                <span className="text-sm font-semibold text-green-700 dark:text-green-400">File uploaded successfully</span>
+                              </div>
+                              {formData.mediaName && (
+                                <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">{formData.mediaName}</p>
+                              )}
+                              <div className="flex items-center justify-center gap-3 mt-1.5">
+                                {formData.mediaSize && (
+                                  <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">{formData.mediaSize}</span>
+                                )}
+                                <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">{formData.mediaType}</span>
+                              </div>
+                              <label className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                <Upload size={14} />
+                                Replace file
+                                <input
+                                  type="file"
+                                  accept="image/*,video/*"
+                                  onChange={handleFileChange}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Navigation buttons */}
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div>
+                  {formStep > 1 && (
+                    <motion.button
+                      whileHover={{ scale: 1.02, x: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setFormStep(formStep - 1)}
+                      className="flex items-center gap-2 px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all duration-300"
+                    >
+                      <ChevronLeft size={18} /> Back
+                    </motion.button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowForm(false)}
+                    className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all duration-300"
+                  >
+                    Cancel
+                  </motion.button>
+                  {formStep < 3 ? (
+                    <motion.button
+                      whileHover={{ scale: 1.02, x: 2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        if (formStep === 1) {
+                          if (!formData.title.trim()) { toast.error('Please enter a title'); return; }
+                          if (!formData.company.trim()) { toast.error('Please enter a company name'); return; }
+                        }
+                        if (formStep === 2) {
+                          if (!formData.location) { toast.error('Please select a location'); return; }
+                        }
+                        setFormStep(formStep + 1);
+                      }}
+                      className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/30 hover:shadow-xl transition-all duration-300"
+                    >
+                      Next <ChevronRight size={18} />
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        if (!formData.preview) { toast.error('Please upload media before saving'); return; }
+                        handleSave();
+                      }}
+                      disabled={saving}
+                      className={`flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-green-500/30 hover:shadow-xl transition-all duration-300 ${
+                        saving ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {saving ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={18} /> Save Ad
+                        </>
+                      )}
+                    </motion.button>
                   )}
                 </div>
               </div>
-
-              <div className="flex gap-3 mt-6">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleSave}
-                  disabled={saving}
-                  className={`flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/50 hover:shadow-xl transition-all duration-300 ${
-                    saving ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {saving ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18} /> Save
-                    </>
-                  )}
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowForm(false)}
-                  className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all duration-300"
-                >
-                  Cancel
-                </motion.button>
               </div>
             </motion.div>
           </motion.div>

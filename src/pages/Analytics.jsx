@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Monitor, Truck, TrendingUp, MapPin, Activity, Eye, Target, BarChart3 } from 'lucide-react'
+import { Monitor, Truck, TrendingUp, MapPin, Activity, Eye, Target, BarChart3, FileDown } from 'lucide-react'
 import { db } from '../firebase'
 import { collection, onSnapshot, query } from 'firebase/firestore'
 import RealTimeIndicator from '../components/ui/RealTimeIndicator'
@@ -290,6 +290,82 @@ const Analytics = () => {
   const totalVehicles = vehicles.length
   const activeVehicles = vehicles.filter(vehicle => vehicle.status === 'Active').length
 
+  const handleExportPDF = () => {
+    const now = new Date()
+    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+    const topAdsRows = displayTopAds.map((ad, i) => `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 12px; font-size: 14px;">${i + 1}</td>
+        <td style="padding: 10px 12px; font-size: 14px; font-weight: 500;">${ad.title}</td>
+        <td style="padding: 10px 12px; font-size: 14px;">${ad.impressions.toLocaleString()}</td>
+        <td style="padding: 10px 12px; font-size: 14px;">${ad.location}</td>
+        <td style="padding: 10px 12px; font-size: 14px;">
+          <span style="background: ${ad.status === 'Active' ? '#d1fae5' : '#fee2e2'}; color: ${ad.status === 'Active' ? '#065f46' : '#991b1b'}; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">${ad.status}</span>
+        </td>
+      </tr>
+    `).join('')
+
+    const html = `<!DOCTYPE html>
+<html><head><title>AdMotion Analytics Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; padding: 40px; }
+  .header { text-align: center; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 3px solid #1e3a5f; }
+  .header h1 { font-size: 28px; color: #1e3a5f; margin-bottom: 4px; }
+  .header p { font-size: 14px; color: #64748b; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .kpi-card { padding: 20px; border-radius: 12px; text-align: center; }
+  .kpi-card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; opacity: 0.8; }
+  .kpi-card .value { font-size: 32px; font-weight: 700; }
+  .kpi-blue { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+  .kpi-green { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+  .kpi-violet { background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; }
+  .kpi-amber { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; }
+  .section-title { font-size: 18px; font-weight: 600; color: #1e3a5f; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+  th { background: #1e3a5f; color: white; padding: 12px; text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 10px 12px; font-size: 14px; }
+  tr:nth-child(even) { background: #f8fafc; }
+  .summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-top: 24px; }
+  .summary h3 { font-size: 16px; color: #1e3a5f; margin-bottom: 12px; }
+  .summary p { font-size: 14px; color: #475569; line-height: 1.6; }
+  .footer { text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; }
+  @media print { body { padding: 20px; } }
+</style></head><body>
+  <div class="header">
+    <h1>AdMotion Analytics Report</h1>
+    <p>Generated on ${dateStr} | Period: ${selectedPeriod}</p>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-blue"><h3>Total Ads</h3><div class="value">${totalAds}</div></div>
+    <div class="kpi-card kpi-green"><h3>Active Ads</h3><div class="value">${activeAds}</div></div>
+    <div class="kpi-card kpi-violet"><h3>Total Vehicles</h3><div class="value">${totalVehicles}</div></div>
+    <div class="kpi-card kpi-amber"><h3>Active Vehicles</h3><div class="value">${activeVehicles}</div></div>
+  </div>
+
+  <h2 class="section-title">Top Performing Ads</h2>
+  <table>
+    <thead><tr><th>#</th><th>Ad Title</th><th>Impressions</th><th>Location</th><th>Status</th></tr></thead>
+    <tbody>${topAdsRows}</tbody>
+  </table>
+
+  <div class="summary">
+    <h3>Summary</h3>
+    <p>This report covers the analytics for the <strong>${selectedPeriod}</strong> period. There are currently <strong>${totalAds}</strong> ads in the system, of which <strong>${activeAds}</strong> are active. The fleet consists of <strong>${totalVehicles}</strong> vehicles with <strong>${activeVehicles}</strong> currently active. The top performing ads are listed above with their impression counts and deployment locations.</p>
+  </div>
+
+  <div class="footer">AdMotion - Vehicle Advertising Platform | Report generated automatically</div>
+</body></html>`
+
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   return (
     <div className='p-4 md:p-6 transition-colors duration-300'>
       {/* Header */}
@@ -302,7 +378,18 @@ const Analytics = () => {
           <BarChart3 className="w-6 h-6" />
           <h1 className='text-xl md:text-2xl font-bold'>Analytics</h1>
         </div>
-        <RealTimeIndicator isActive={!loading} />
+        <div className="flex items-center gap-3">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium transition-all duration-200"
+          >
+            <FileDown className="w-4 h-4" />
+            Export PDF
+          </motion.button>
+          <RealTimeIndicator isActive={!loading} />
+        </div>
       </motion.div>
 
       {/* Date Filters */}

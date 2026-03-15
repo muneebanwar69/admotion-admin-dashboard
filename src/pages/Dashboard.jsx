@@ -6,8 +6,10 @@ import { Flag, CheckSquare, Truck, Activity, MapPin, Clock, Sun, Moon, CloudSun 
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { SkeletonKpiCard } from '../components/ui/SkeletonLoader'
-import { EmptyVehicles } from '../components/ui/EmptyState'
 import RealTimeIndicator from '../components/ui/RealTimeIndicator'
+import DashboardCustomizer from '../components/DashboardCustomizer'
+import useDashboardLayout from '../hooks/useDashboardLayout'
+import { FleetUtilizationWidget, TopAdsWidget, QuickActionsWidget } from '../components/DashboardWidgets'
 
 // Geocoding cache
 const geocodeCache = new Map()
@@ -83,19 +85,15 @@ const getGreeting = () => {
   return { text: 'Good Evening', icon: Moon }
 }
 
-/**
- * Pixel-alike Dashboard page containing:
- * - Welcome banner with greeting
- * - Header row with four KPI cards
- * - Map with markers
- * - Real-time table of vehicles & ads
- */
 const Dashboard = () => {
   const [ads, setAds] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading] = useState(true)
   const [placeNames, setPlaceNames] = useState({})
   const [currentTime, setCurrentTime] = useState(new Date())
+
+  // Dashboard customization
+  const { layout, visibleWidgets, toggleWidget, moveWidget, resetLayout, isCustomized } = useDashboardLayout()
 
   // Refs for scroll animations
   const kpiRef = useRef(null)
@@ -148,8 +146,8 @@ const Dashboard = () => {
           setVehicles(vehiclesData)
 
           for (const vehicle of vehiclesData) {
-            const lat = vehicle.location?.lat || vehicle.lastLocation?.lat
-            const lon = vehicle.location?.lon || vehicle.lastLocation?.lon
+            const lat = vehicle.currentLocation?.lat || vehicle.location?.lat || vehicle.lastLocation?.lat
+            const lon = vehicle.currentLocation?.lng || vehicle.currentLocation?.lon || vehicle.location?.lon || vehicle.lastLocation?.lon
 
             if (lat && lon) {
               if (vehicle.location?.address) {
@@ -227,10 +225,13 @@ const Dashboard = () => {
 
   // Check if vehicle is online
   const isOnline = (vehicle) => {
-    if (!vehicle.lastHeartbeat) return false
-    const date = vehicle.lastHeartbeat.toDate ? vehicle.lastHeartbeat.toDate() : new Date(vehicle.lastHeartbeat)
-    const diff = (new Date() - date) / 1000
-    return diff < 300
+    // Check lastSeen (from display player) or lastHeartbeat
+    const checkTimestamp = (ts) => {
+      if (!ts) return false
+      const date = ts.toDate ? ts.toDate() : new Date(ts)
+      return (new Date() - date) / 1000 < 300
+    }
+    return checkTimestamp(vehicle.lastSeen) || checkTimestamp(vehicle.lastHeartbeat)
   }
 
   // Vehicle-ad assignments for the table
@@ -242,13 +243,150 @@ const Dashboard = () => {
     ad: getCurrentAdForVehicle(vehicle),
     status: vehicle.status || 'Active',
     online: isOnline(vehicle),
-    lastSeen: formatLastSeen(vehicle.lastHeartbeat),
-    location: placeNames[vehicle.id] || vehicle.location?.address || 'No location',
-    hasLocation: !!(vehicle.location?.lat || vehicle.lastLocation?.lat)
+    lastSeen: formatLastSeen(vehicle.lastSeen || vehicle.lastHeartbeat),
+    location: placeNames[vehicle.id] || vehicle.location?.address || 'Fetching...',
+    hasLocation: !!(vehicle.currentLocation?.lat || vehicle.location?.lat || vehicle.lastLocation?.lat)
   }))
 
   const greeting = getGreeting()
   const GreetingIcon = greeting.icon
+
+  // Widget renderer
+  const renderWidget = (widgetId) => {
+    switch (widgetId) {
+      case 'kpi-cards':
+        return (
+          <motion.div
+            key="kpi-cards"
+            ref={kpiRef}
+            initial={{ opacity: 0, y: 30 }}
+            animate={kpiInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5 }}
+            className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6'
+          >
+            {loading ? (
+              <><SkeletonKpiCard /><SkeletonKpiCard /><SkeletonKpiCard /><SkeletonKpiCard /></>
+            ) : (
+              <>
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0 }}>
+                  <KpiCard title='Total Ads' value={<AnimatedCounter value={totalAds} />} icon={<Flag />} index={0} color="blue" />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}>
+                  <KpiCard title='Active Ads' value={<AnimatedCounter value={activeAds} />} icon={<CheckSquare />} index={1} color="emerald" />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
+                  <KpiCard title='Total Vehicles' value={<AnimatedCounter value={totalVehicles} />} icon={<Truck />} index={2} color="violet" />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.3 }}>
+                  <KpiCard title='Active Vehicles' value={<AnimatedCounter value={activeVehicles} />} icon={<Activity />} index={3} color="amber" />
+                </motion.div>
+              </>
+            )}
+          </motion.div>
+        )
+      case 'map':
+        return (
+          <motion.div key="map" ref={mapRef} initial={{ opacity: 0, y: 30 }} animate={mapInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6 }} className='mb-6'>
+            <MapView />
+          </motion.div>
+        )
+      case 'vehicle-table':
+        return (
+          <motion.div key="vehicle-table" ref={tableRef} initial={{ opacity: 0, y: 30 }} animate={tableInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6 }} className="mb-6">
+            <div className="overflow-x-auto rounded-2xl shadow-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 transition-colors duration-300">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gradient-to-r from-brand-900 to-brand-800 text-white">
+                  <tr>
+                    <th className="p-4 text-left font-semibold">Vehicle ID</th>
+                    <th className="p-4 text-left font-semibold">Vehicle Name</th>
+                    <th className="p-4 text-left font-semibold">Owner</th>
+                    <th className="p-4 text-left font-semibold">Current Ad</th>
+                    <th className="p-4 text-left font-semibold">Location</th>
+                    <th className="p-4 text-center font-semibold">Online</th>
+                    <th className="p-4 text-center font-semibold">Last Seen</th>
+                    <th className="p-4 text-center font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading && vehicleAdAssignments.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="p-6 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-gray-500 dark:text-slate-400">Loading vehicles...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : vehicleAdAssignments.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="p-6 text-center text-gray-500 dark:text-slate-400">No vehicles found</td>
+                    </tr>
+                  ) : (
+                    vehicleAdAssignments.map((v, index) => (
+                      <motion.tr
+                        key={v.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: index * 0.04, duration: 0.4 }}
+                        className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-all duration-200 group"
+                      >
+                        <td className="p-3 dark:text-slate-100 font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{v.id}</td>
+                        <td className="p-3 dark:text-slate-100 font-medium">{v.vehicleName}</td>
+                        <td className="p-3 dark:text-slate-300 text-gray-600">{v.ownerName}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-xl text-xs font-medium ${v.ad !== 'No Ad Assigned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                            {v.ad}
+                          </span>
+                        </td>
+                        <td className="p-3 dark:text-slate-300 text-gray-600 max-w-[200px]" title={v.location}>
+                          {v.hasLocation ? (
+                            <span className="flex items-center gap-1.5">
+                              <MapPin className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                              <span className="truncate">{v.location}</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 dark:text-slate-500 italic">No location</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${v.online ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                            <span className={`w-2 h-2 rounded-full ${v.online ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                            {v.online ? 'Online' : 'Offline'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center dark:text-slate-400 text-gray-500 text-xs">{v.lastSeen}</td>
+                        <td className="p-3 text-center">
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            whileInView={{ scale: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: index * 0.04 + 0.2, type: 'spring' }}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${v.status === 'Active' ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-400/50' : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-400/50'}`}
+                          >
+                            {v.status}
+                          </motion.span>
+                        </td>
+                      </motion.tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )
+      case 'recent-activity':
+        return null
+      case 'utilization':
+        return <div key="utilization" className="mb-6"><FleetUtilizationWidget /></div>
+      case 'top-ads':
+        return <div key="top-ads" className="mb-6"><TopAdsWidget /></div>
+      case 'quick-actions':
+        return <div key="quick-actions" className="mb-6"><QuickActionsWidget /></div>
+      default:
+        return null
+    }
+  }
 
   return (
     <div className='p-4 md:p-6 transition-colors duration-300 relative'>
@@ -287,179 +425,33 @@ const Dashboard = () => {
               </p>
             </div>
           </div>
-          <RealTimeIndicator isActive={!loading} />
+          <div className="flex items-center gap-3">
+            <RealTimeIndicator isActive={!loading} />
+            <div className="relative">
+              <DashboardCustomizer
+                layout={layout}
+                onToggle={toggleWidget}
+                onMove={moveWidget}
+                onReset={resetLayout}
+                isCustomized={isCustomized}
+              />
+            </div>
+          </div>
         </div>
       </motion.div>
 
-      {/* KPI Cards */}
-      <motion.div
-        ref={kpiRef}
-        initial={{ opacity: 0, y: 30 }}
-        animate={kpiInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.5 }}
-        className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6'
-      >
-        {loading ? (
-          <>
-            <SkeletonKpiCard />
-            <SkeletonKpiCard />
-            <SkeletonKpiCard />
-            <SkeletonKpiCard />
-          </>
-        ) : (
-          <>
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.5, delay: 0 }}
-            >
-              <KpiCard title='Total Ads' value={<AnimatedCounter value={totalAds} />} icon={<Flag />} index={0} color="blue" />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <KpiCard title='Active Ads' value={<AnimatedCounter value={activeAds} />} icon={<CheckSquare />} index={1} color="emerald" />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <KpiCard title='Total Vehicles' value={<AnimatedCounter value={totalVehicles} />} icon={<Truck />} index={2} color="violet" />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <KpiCard title='Active Vehicles' value={<AnimatedCounter value={activeVehicles} />} icon={<Activity />} index={3} color="amber" />
-            </motion.div>
-          </>
-        )}
-      </motion.div>
+      {/* Render visible widgets in order */}
+      {visibleWidgets.map(widget => renderWidget(widget.id))}
 
-      {/* Map */}
-      <motion.div
-        ref={mapRef}
-        initial={{ opacity: 0, y: 30 }}
-        animate={mapInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.6 }}
-        className='mb-6'
-      >
-        <MapView />
-      </motion.div>
-
-      {/* Vehicle/Ads Table */}
-      <motion.div
-        ref={tableRef}
-        initial={{ opacity: 0, y: 30 }}
-        animate={tableInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.6 }}
-        className="mb-6"
-      >
-        <div className="overflow-x-auto rounded-2xl shadow-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 transition-colors duration-300">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gradient-to-r from-brand-900 to-brand-800 text-white">
-              <tr>
-                <th className="p-4 text-left font-semibold">Vehicle ID</th>
-                <th className="p-4 text-left font-semibold">Vehicle Name</th>
-                <th className="p-4 text-left font-semibold">Owner</th>
-                <th className="p-4 text-left font-semibold">Current Ad</th>
-                <th className="p-4 text-left font-semibold">Location</th>
-                <th className="p-4 text-center font-semibold">Online</th>
-                <th className="p-4 text-center font-semibold">Last Seen</th>
-                <th className="p-4 text-center font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && vehicleAdAssignments.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="p-6 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-gray-500 dark:text-slate-400">Loading vehicles...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : vehicleAdAssignments.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="p-6 text-center text-gray-500 dark:text-slate-400">
-                    No vehicles found
-                  </td>
-                </tr>
-              ) : (
-                vehicleAdAssignments.map((v, index) => (
-                  <motion.tr
-                    key={v.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.04, duration: 0.4 }}
-                    className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-all duration-200 group"
-                  >
-                    <td className="p-3 dark:text-slate-100 font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{v.id}</td>
-                    <td className="p-3 dark:text-slate-100 font-medium">{v.vehicleName}</td>
-                    <td className="p-3 dark:text-slate-300 text-gray-600">{v.ownerName}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded-xl text-xs font-medium ${
-                        v.ad !== 'No Ad Assigned'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                      }`}>
-                        {v.ad}
-                      </span>
-                    </td>
-                    <td className="p-3 dark:text-slate-300 text-gray-600 max-w-[200px]" title={v.location}>
-                      {v.hasLocation ? (
-                        <span className="flex items-center gap-1.5">
-                          <MapPin className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span className="truncate">{v.location}</span>
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 dark:text-slate-500 italic">No location</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        v.online
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                      }`}>
-                        <span className={`w-2 h-2 rounded-full ${v.online ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                        {v.online ? 'Online' : 'Offline'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center dark:text-slate-400 text-gray-500 text-xs">
-                      {v.lastSeen}
-                    </td>
-                    <td className="p-3 text-center">
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        whileInView={{ scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: index * 0.04 + 0.2, type: 'spring' }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${
-                          v.status === 'Active'
-                            ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-400/50'
-                            : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-400/50'
-                        }`}
-                      >
-                        {v.status}
-                      </motion.span>
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* Extra widgets in grid for side-by-side layout */}
+      {visibleWidgets.some(w => ['recent-activity', 'utilization', 'top-ads', 'quick-actions'].includes(w.id)) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {visibleWidgets
+            .filter(w => ['recent-activity', 'utilization', 'top-ads', 'quick-actions'].includes(w.id))
+            .map(() => null) /* Already rendered above */
+          }
         </div>
-      </motion.div>
+      )}
     </div>
   )
 }

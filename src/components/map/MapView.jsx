@@ -347,7 +347,7 @@ const MapView = () => {
   const activeVehicles = vehicles.filter(v => v.status === 'Active').length
   const totalVehicles = vehicles.length
   const vehiclesWithLocation = useMemo(
-    () => vehicles.filter(v => (v.location?.lat && v.location?.lon) || (v.lastLocation?.lat && v.lastLocation?.lon)),
+    () => vehicles.filter(v => v.currentLocation?.lat || v.location?.lat || v.lastLocation?.lat),
     [vehicles]
   )
 
@@ -401,8 +401,8 @@ const MapView = () => {
   const handleFitAll = useCallback(() => {
     if (!mapRef.current || vehiclesWithLocation.length === 0) return
     const bounds = vehiclesWithLocation.map(v => [
-      v.location?.lat || v.lastLocation?.lat,
-      v.location?.lon || v.lastLocation?.lon,
+      v.currentLocation?.lat || v.location?.lat || v.lastLocation?.lat,
+      v.currentLocation?.lng || v.currentLocation?.lon || v.location?.lon || v.lastLocation?.lon,
     ])
     mapRef.current.fitBounds(bounds, { padding: [50, 50], duration: 1 })
   }, [vehiclesWithLocation])
@@ -413,8 +413,8 @@ const MapView = () => {
   }, [])
 
   const handleVehicleClick = useCallback((vehicle) => {
-    const lat = vehicle.location?.lat || vehicle.lastLocation?.lat
-    const lon = vehicle.location?.lon || vehicle.lastLocation?.lon
+    const lat = vehicle.currentLocation?.lat || vehicle.location?.lat || vehicle.lastLocation?.lat
+    const lon = vehicle.currentLocation?.lng || vehicle.currentLocation?.lon || vehicle.location?.lon || vehicle.lastLocation?.lon
     if (lat && lon) {
       setSelectedVehicleId(vehicle.id)
       setFlyTo([lat, lon])
@@ -446,8 +446,8 @@ const MapView = () => {
       setLoading(false)
 
       for (const vehicle of data) {
-        const lat = vehicle.location?.lat || vehicle.lastLocation?.lat
-        const lon = vehicle.location?.lon || vehicle.lastLocation?.lon
+        const lat = vehicle.currentLocation?.lat || vehicle.location?.lat || vehicle.lastLocation?.lat
+        const lon = vehicle.currentLocation?.lng || vehicle.currentLocation?.lon || vehicle.location?.lon || vehicle.lastLocation?.lon
         if (lat && lon && !placeNames[vehicle.id]) {
           const placeName = await getPlaceName(lat, lon)
           setPlaceNames(prev => ({ ...prev, [vehicle.id]: placeName }))
@@ -586,11 +586,17 @@ const MapView = () => {
             />
 
             {vehiclesWithLocation.map(vehicle => {
-              const lat = vehicle.location?.lat || vehicle.lastLocation?.lat
-              const lon = vehicle.location?.lon || vehicle.lastLocation?.lon
+              const lat = vehicle.currentLocation?.lat || vehicle.location?.lat || vehicle.lastLocation?.lat
+              const lon = vehicle.currentLocation?.lng || vehicle.currentLocation?.lon || vehicle.location?.lon || vehicle.lastLocation?.lon
               if (!lat || !lon) return null
 
-              const isActive = vehicle.status === 'Active'
+              const isActive = (() => {
+                if (vehicle.status !== 'Active') return false
+                const ts = vehicle.lastSeen
+                if (!ts) return false
+                const date = ts.toDate ? ts.toDate() : new Date(ts)
+                return (new Date() - date) / 1000 < 300
+              })()
               const adObj = getCurrentAd(vehicle)
               const adName = adObj?.title || 'No Ad Assigned'
               const placeName = placeNames[vehicle.id] || vehicle.location?.address || 'Fetching...'

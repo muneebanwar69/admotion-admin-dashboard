@@ -34,6 +34,7 @@ export default {
         'fade-in-right': 'fadeInRight 0.6s ease-out forwards',
         'float': 'float 3s ease-in-out infinite',
         'gradient': 'gradient-shift 3s ease infinite',
+        'shimmer': 'shimmer 3s infinite',
       },
       keyframes: {
         fadeInUp: {
@@ -56,6 +57,10 @@ export default {
           '0%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
           '100%': { backgroundPosition: '0% 50%' },
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%) skewX(-12deg)' },
+          '100%': { transform: 'translateX(200%) skewX(-12deg)' },
         },
       }
     }

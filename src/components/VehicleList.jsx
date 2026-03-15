@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, X, Truck, Plus, Pencil, Trash2 } from "lucide-react";
+import { Search, X, Truck, Plus, Pencil, Trash2, MessageCircle } from "lucide-react";
 import RealTimeIndicator from "./ui/RealTimeIndicator";
 
-const VehicleList = ({ vehicles, onAdd, onEdit, onAskDelete }) => {
+const VehicleList = ({ vehicles, onAdd, onEdit, onAskDelete, onChat }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter vehicles based on search query
@@ -191,6 +191,17 @@ const VehicleList = ({ vehicles, onAdd, onEdit, onAskDelete }) => {
                           >
                             <Trash2 size={16} />
                           </motion.button>
+                          {onChat && (
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => onChat(v)}
+                              className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-900/50 transition-all duration-200"
+                              title="Chat with driver"
+                            >
+                              <MessageCircle size={16} />
+                            </motion.button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>

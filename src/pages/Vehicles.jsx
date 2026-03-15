@@ -21,6 +21,10 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
+  query,
+  where,
+  getDocs,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -333,6 +337,47 @@ const Vehicles = () => {
     }
   };
 
+  const handleChat = async (vehicle) => {
+    const currentUserId = currentUser?.uid;
+    if (!currentUserId) return;
+
+    try {
+      // Check for existing conversation
+      const q = query(
+        collection(db, 'conversations'),
+        where('participants', 'array-contains', currentUserId)
+      );
+      const snap = await getDocs(q);
+      const existing = snap.docs.find(d => {
+        const data = d.data();
+        return data.participants?.includes(vehicle.id);
+      });
+
+      if (existing) {
+        toast.info(`Chat with ${vehicle.ownerName || vehicle.vehicleName} is available in the messaging widget`);
+        return;
+      }
+
+      // Create new conversation
+      await addDoc(collection(db, 'conversations'), {
+        participants: [currentUserId, vehicle.id],
+        participantNames: {
+          [currentUserId]: currentUser.displayName || currentUser.username || 'Admin',
+          [vehicle.id]: `${vehicle.ownerName || 'Driver'} (${vehicle.carId || vehicle.id})`,
+        },
+        participantType: 'driver',
+        lastMessage: null,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        unreadCount: { [currentUserId]: 0, [vehicle.id]: 0 },
+      });
+      toast.success(`Chat started with ${vehicle.ownerName || vehicle.vehicleName}! Open the messaging widget.`);
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      toast.error('Failed to start chat. Please try again.');
+    }
+  };
+
   if (mode === "list") {
     return (
       <motion.div
@@ -348,6 +393,7 @@ const Vehicles = () => {
           onAdd={startAdd}
           onEdit={startEdit}
           onAskDelete={setAskDeleteId}
+          onChat={handleChat}
         />
         <ConfirmDeleteDialog
           open={!!askDeleteId}

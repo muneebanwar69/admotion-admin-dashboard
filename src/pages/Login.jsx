@@ -1,4 +1,5 @@
 import React, { useState, lazy, Suspense } from 'react'
+import { Link } from 'react-router-dom'
 import { FiEye, FiEyeOff, FiUser, FiLock, FiLogIn, FiZap, FiArrowRight } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
@@ -370,6 +371,9 @@ const Login = () => {
               <motion.div variants={fadeUp} className="text-center space-y-3">
                 <p className="text-white/20 text-[11px]">
                   Hint: use <span className="text-cyan-400/40 font-medium">muneeb</span> for both fields
+                </p>
+                <p className="text-white/20 text-[11px] mt-1">
+                  Driver? <Link to="/driver/login" className="text-amber-400/50 hover:text-amber-400/80 transition-colors font-medium">Sign in to Driver Portal</Link>
                 </p>
                 <div className="flex items-center justify-center gap-2.5">
                   <span className="relative flex h-1.5 w-1.5">

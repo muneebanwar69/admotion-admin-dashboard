@@ -1,21 +1,28 @@
-// Generates a sequential car id like 01, 02, 03...
+// Generates a sequential car id like ADM-0001, ADM-0002, ADM-0003...
 export function generateCarId(existingVehicles = []) {
-  // Extract numeric IDs from existing vehicles
-  const existingIds = existingVehicles
+  const PREFIX = 'ADM-';
+
+  // Extract numeric parts from existing vehicle IDs
+  const existingNums = existingVehicles
     .map(v => {
       const id = v.carId;
-      // Handle both numeric (01, 02) and old format (CAR-XXX)
-      if (/^\d+$/.test(id)) {
+      // Handle ADM-XXXX format
+      if (id && id.startsWith(PREFIX)) {
+        const num = parseInt(id.slice(PREFIX.length), 10);
+        return isNaN(num) ? 0 : num;
+      }
+      // Handle legacy plain-number IDs (e.g. "01", "02")
+      if (id && /^\d+$/.test(id)) {
         return parseInt(id, 10);
       }
       return 0;
     })
-    .filter(id => id > 0);
+    .filter(n => n > 0);
 
-  // Find the highest ID and add 1
-  const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-  const nextId = maxId + 1;
+  // Find the highest number and increment
+  const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+  const nextNum = maxNum + 1;
 
-  // Format with leading zero (01, 02, etc.)
-  return String(nextId).padStart(2, '0');
+  // Format as ADM-0001, ADM-0002, etc.
+  return `${PREFIX}${String(nextNum).padStart(4, '0')}`;
 }

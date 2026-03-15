@@ -50,19 +50,25 @@ export function AuthProvider({ children }) {
         const adminData = adminDoc.data()
 
         // Check password using bcrypt
-        // Support both hashed (new) and plain text (legacy) passwords for migration
         let passwordMatch = false
-        
+
         if (adminData.password) {
-          // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
           if (adminData.password.startsWith('$2')) {
-            // Hashed password - use bcrypt compare
+            // Bcrypt hashed password
             passwordMatch = await comparePassword(password, adminData.password)
           } else {
-            // Legacy plain text password - compare directly (for migration period)
-            // TODO: Remove this after all passwords are migrated to hashed
-            passwordMatch = adminData.password === password
-            console.warn('⚠️ Using plain text password comparison. Please migrate to hashed passwords.')
+            // Legacy plaintext - auto-migrate to bcrypt on successful match
+            if (adminData.password === password) {
+              passwordMatch = true
+              // Auto-migrate: hash the password and update Firestore
+              try {
+                const { hashPassword } = await import('../utils/password')
+                const hashed = await hashPassword(password)
+                const { updateDoc, doc } = await import('firebase/firestore')
+                await updateDoc(doc(db, 'admins', adminDoc.id), { password: hashed })
+                console.log('Password auto-migrated to bcrypt')
+              } catch (e) { /* silent fail on migration */ }
+            }
           }
         }
 
