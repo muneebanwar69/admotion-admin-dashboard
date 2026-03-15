@@ -260,6 +260,7 @@ function AdminAppRoutes() {
 }
 
 // Main App Routes - handles both driver and admin
+// If this device is a registered display (saved in localStorage), auto-redirect to display player
 function AppRoutes() {
   return <DriverAppRoutes />
 }

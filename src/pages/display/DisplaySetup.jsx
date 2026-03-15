@@ -6,6 +6,23 @@ import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } fr
 import { db } from '../../firebase'
 import { comparePassword } from '../../utils/password'
 
+// Swap manifest to display-specific one so "Add to Home Screen" opens /display/setup
+const useDisplayManifest = () => {
+  useEffect(() => {
+    // Remove default manifest
+    const existing = document.querySelector('link[rel="manifest"]')
+    if (existing) existing.remove()
+    // Add display manifest
+    const link = document.createElement('link')
+    link.rel = 'manifest'
+    link.href = '/manifest-display.json'
+    document.head.appendChild(link)
+    // Also update apple meta tags
+    document.title = 'AdMotion Display'
+    return () => { link.remove() }
+  }, [])
+}
+
 // Format CNIC as #####-#######-#
 const formatCNIC = (value) => {
   const digits = value.replace(/\D/g, '').slice(0, 13)
@@ -16,6 +33,7 @@ const formatCNIC = (value) => {
 }
 
 const DisplaySetup = () => {
+  useDisplayManifest()
   const [cnic, setCnic] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)

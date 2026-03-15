@@ -50,10 +50,21 @@
     <div id="root"></div>
     <script type="module" src="/src/index.jsx"></script>
     <script>
+      // Instant redirect ONLY for PWA standalone mode (home screen launch)
+      // Never triggers in a normal browser tab
+      (function() {
+        var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone === true;
+        var isDisplay = localStorage.getItem('display_vehicle_id');
+        var path = window.location.pathname;
+        if (isStandalone && isDisplay && (path === '/' || path === '/index.html')) {
+          window.location.replace('/display/play');
+        }
+      })();
       // Remove loader once app is ready
-      window.addEventListener('load', () => {
-        const loader = document.getElementById('app-loader');
-        if (loader) setTimeout(() => loader.remove(), 500);
+      window.addEventListener('load', function() {
+        var loader = document.getElementById('app-loader');
+        if (loader) setTimeout(function() { loader.remove(); }, 500);
       });
     </script>
   </body>

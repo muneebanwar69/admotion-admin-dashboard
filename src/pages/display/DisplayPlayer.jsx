@@ -5,6 +5,20 @@ import { Monitor, Wifi, WifiOff, Zap, Clock, Shield } from 'lucide-react'
 import { doc, onSnapshot, updateDoc, serverTimestamp, collection, addDoc, getDoc, increment } from 'firebase/firestore'
 import { db } from '../../firebase'
 
+// Swap manifest for display-specific PWA
+const useDisplayManifest = () => {
+  useEffect(() => {
+    const existing = document.querySelector('link[rel="manifest"]')
+    if (existing) existing.remove()
+    const link = document.createElement('link')
+    link.rel = 'manifest'
+    link.href = '/manifest-display.json'
+    document.head.appendChild(link)
+    document.title = 'AdMotion Display'
+    return () => { link.remove() }
+  }, [])
+}
+
 // ─── Configuration ───
 const HEARTBEAT_MS = 60_000      // 60s heartbeat
 const GPS_MS = 120_000           // 2 min GPS update
@@ -15,6 +29,7 @@ const MAX_ERROR_COUNT = 3        // Auto-reload after N errors
 const WAKE_LOCK_RETRY_MS = 10_000
 
 const DisplayPlayer = () => {
+  useDisplayManifest()
   const navigate = useNavigate()
   const vehicleDocId = localStorage.getItem('display_vehicle_id')
   const vehicleCarId = localStorage.getItem('display_vehicle_carId') || ''
