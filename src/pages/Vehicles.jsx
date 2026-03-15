@@ -111,6 +111,8 @@ const Vehicles = () => {
     duration: "",
     registrationDate: "",
     password: "",
+    contractRate: "",
+    requiredHoursPerDay: "",
   });
   const [step2, setStep2] = useState({
     firstName: "",
@@ -187,7 +189,7 @@ const Vehicles = () => {
     setCurrentStep(1);
     setEditingId(null);
     setCarId(generateCarId(vehicles));
-    setStep1({ type: "", vehicleName: "", ownerName: "", model: "", color: "", cnic: "", duration: "", registrationDate: "", password: "" });
+    setStep1({ type: "", vehicleName: "", ownerName: "", model: "", color: "", cnic: "", duration: "", registrationDate: "", password: "", contractRate: "", requiredHoursPerDay: "" });
     setStep2({ firstName: "", lastName: "", cnic: "", email: "", accountTitle: "", accountNo: "", iban: "", bankName: "" });
     setStep3({ cnicFrontFile: null, cnicBackFile: null, regDocFile: null, cnicFrontName: "", cnicBackName: "", regDocName: "" });
   };
@@ -200,6 +202,7 @@ const Vehicles = () => {
     setStep1({
       type: v.type, vehicleName: v.vehicleName, ownerName: v.ownerName, model: v.model,
       color: v.color, cnic: v.cnic, duration: v.duration, registrationDate: v.registrationDate, password: v.password || "",
+      contractRate: v.contractRate || "", requiredHoursPerDay: v.requiredHoursPerDay || "",
     });
     setStep2({
       firstName: v.owner.firstName, lastName: v.owner.lastName, cnic: v.owner.cnic, email: v.owner.email,
@@ -251,7 +254,9 @@ const Vehicles = () => {
       const record = {
         carId, type: step1.type, vehicleName: step1.vehicleName, ownerName: step1.ownerName,
         model: step1.model, color: step1.color, cnic: step1.cnic, duration: step1.duration,
-        registrationDate: step1.registrationDate, password: step1.password, status: "Active",
+        registrationDate: step1.registrationDate, password: step1.password,
+        contractRate: parseInt(step1.contractRate) || 0, requiredHoursPerDay: parseInt(step1.requiredHoursPerDay) || 8,
+        status: "Active",
         owner: { firstName: step2.firstName, lastName: step2.lastName, cnic: step2.cnic, email: step2.email },
         bank: { accountTitle: step2.accountTitle, accountNo: step2.accountNo, iban: step2.iban, bankName: step2.bankName },
         docs: {

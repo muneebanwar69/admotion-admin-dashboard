@@ -542,22 +542,20 @@ const Ads = () => {
                         </div>
                       )}
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           onClick={() => handleEdit(ad)}
-                          className="flex-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold text-xs shadow-md hover:shadow-lg transition-all duration-200"
+                          title="Edit ad"
+                          className="group relative p-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                         >
-                          Edit
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          <Pencil className="w-4 h-4 transition-transform group-hover:rotate-12" />
+                        </button>
+                        <button
                           onClick={() => askDelete(ad)}
-                          className="flex-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-semibold text-xs shadow-md hover:shadow-lg transition-all duration-200"
+                          title="Delete ad"
+                          className="group relative p-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                         >
-                          Delete
-                        </motion.button>
+                          <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                        </button>
                       </div>
                     </div>
                   </motion.div>
@@ -675,22 +673,20 @@ const Ads = () => {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-center gap-2">
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           onClick={() => handleEdit(ad)}
-                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                          title="Edit ad"
+                          className="group relative p-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                         >
-                          Edit
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          <Pencil className="w-4 h-4 transition-transform group-hover:rotate-12" />
+                        </button>
+                        <button
                           onClick={() => askDelete(ad)}
-                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                          title="Delete ad"
+                          className="group relative p-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                         >
-                          Delete
-                        </motion.button>
+                          <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                        </button>
                       </div>
                     </td>
                         </motion.tr>

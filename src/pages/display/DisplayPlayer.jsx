@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Monitor, Wifi, WifiOff, Zap, Clock } from 'lucide-react'
+import { Monitor, Wifi, WifiOff, Zap, Clock, Shield } from 'lucide-react'
 import { doc, onSnapshot, updateDoc, serverTimestamp, collection, addDoc, getDoc, increment } from 'firebase/firestore'
 import { db } from '../../firebase'
 
-// Heartbeat interval (60s) and GPS interval (30s)
-const HEARTBEAT_MS = 60_000
-const GPS_MS = 30_000
-const AD_DURATION_DEFAULT = 10_000 // 10s per ad if no duration set
+// ─── Configuration ───
+const HEARTBEAT_MS = 60_000      // 60s heartbeat
+const GPS_MS = 120_000           // 2 min GPS update
+const AD_DURATION_DEFAULT = 10_000 // 10s per ad
+const CRASH_RECOVERY_KEY = 'display_crash_recovery'
+const OFFLINE_ADS_KEY = 'display_offline_ads'
+const MAX_ERROR_COUNT = 3        // Auto-reload after N errors
+const WAKE_LOCK_RETRY_MS = 10_000
 
 const DisplayPlayer = () => {
   const navigate = useNavigate()
@@ -17,20 +21,158 @@ const DisplayPlayer = () => {
   const vehicleName = localStorage.getItem('display_vehicle_name') || ''
 
   const [ads, setAds] = useState([])
-  const [adDetails, setAdDetails] = useState({}) // adId -> ad data
+  const [adDetails, setAdDetails] = useState({})
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [lastHeartbeat, setLastHeartbeat] = useState(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showOverlay, setShowOverlay] = useState(true)
   const [transitioning, setTransitioning] = useState(false)
+  const [errorCount, setErrorCount] = useState(0)
+  const [uptimeStart] = useState(Date.now())
   const videoRef = useRef(null)
   const timerRef = useRef(null)
+  const wakeLockRef = useRef(null)
 
-  // Redirect if not setup
+  // ─── Redirect if not setup ───
   useEffect(() => {
     if (!vehicleDocId) navigate('/display/setup', { replace: true })
   }, [vehicleDocId, navigate])
+
+  // ─── 1. AUTO-FULLSCREEN KIOSK MODE ───
+  useEffect(() => {
+    const enterFullscreen = async () => {
+      try {
+        const el = document.documentElement
+        if (el.requestFullscreen) await el.requestFullscreen()
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen()
+        else if (el.msRequestFullscreen) await el.msRequestFullscreen()
+      } catch (e) { /* User gesture may be required - will retry on first touch */ }
+    }
+    // Try immediately
+    enterFullscreen()
+    // Also on first user interaction (Android TV remote click)
+    const retryOnInteraction = () => { enterFullscreen(); window.removeEventListener('click', retryOnInteraction) }
+    window.addEventListener('click', retryOnInteraction)
+    return () => window.removeEventListener('click', retryOnInteraction)
+  }, [])
+
+  // ─── 2. WAKE LOCK (prevent screen sleep) ───
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLockRef.current = await navigator.wakeLock.request('screen')
+          wakeLockRef.current.addEventListener('release', () => {
+            // Re-acquire if released
+            setTimeout(requestWakeLock, WAKE_LOCK_RETRY_MS)
+          })
+        }
+      } catch (e) { /* Wake lock not supported or failed */ }
+    }
+    requestWakeLock()
+    // Re-acquire on visibility change
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') requestWakeLock()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      wakeLockRef.current?.release().catch(() => {})
+    }
+  }, [])
+
+  // ─── 3. CRASH RECOVERY (auto-reload on errors) ───
+  useEffect(() => {
+    // Mark that we're running - on next boot, check if we crashed
+    localStorage.setItem(CRASH_RECOVERY_KEY, Date.now().toString())
+
+    const handleError = (e) => {
+      setErrorCount(prev => {
+        const next = prev + 1
+        if (next >= MAX_ERROR_COUNT) {
+          // Too many errors - reload the page
+          localStorage.setItem(CRASH_RECOVERY_KEY, 'crashed')
+          window.location.reload()
+        }
+        return next
+      })
+    }
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleError)
+
+    // Check if we recovered from a crash
+    const lastState = localStorage.getItem(CRASH_RECOVERY_KEY)
+    if (lastState === 'crashed') {
+      localStorage.setItem(CRASH_RECOVERY_KEY, 'recovered')
+    }
+
+    return () => {
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleError)
+    }
+  }, [])
+
+  // ─── 4. OFFLINE AD CACHING (IndexedDB) ───
+  const idbName = 'admotion_display'
+  const idbStore = 'offline_ads'
+
+  const openIDB = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(idbName, 1)
+      req.onupgradeneeded = () => req.result.createObjectStore(idbStore, { keyPath: 'id' })
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+  }, [])
+
+  // Save ad details to IndexedDB when fetched
+  useEffect(() => {
+    if (Object.keys(adDetails).length === 0) return
+    const save = async () => {
+      try {
+        const idb = await openIDB()
+        const tx = idb.transaction(idbStore, 'readwrite')
+        const store = tx.objectStore(idbStore)
+        for (const [id, ad] of Object.entries(adDetails)) {
+          store.put({
+            id,
+            title: ad.title,
+            type: ad.type || ad.mediaType,
+            mediaBase64: ad.mediaBase64 || '',
+            mediaUrl: ad.mediaUrl || '',
+            preview: ad.preview || '',
+            company: ad.company || '',
+            duration: ad.duration || '',
+          })
+        }
+      } catch (e) { /* silent */ }
+    }
+    save()
+  }, [adDetails, openIDB])
+
+  // Load cached ads from IndexedDB on startup if offline
+  useEffect(() => {
+    if (navigator.onLine) return
+    const load = async () => {
+      try {
+        const idb = await openIDB()
+        const tx = idb.transaction(idbStore, 'readonly')
+        const store = tx.objectStore(idbStore)
+        const req = store.getAll()
+        req.onsuccess = () => {
+          const items = req.result
+          if (items.length > 0) {
+            const cached = {}
+            items.forEach(item => { cached[item.id] = item })
+            setAdDetails(cached)
+            setAds(items.map(item => ({ adId: item.id })))
+          }
+        }
+      } catch (e) { /* silent */ }
+    }
+    load()
+  }, [openIDB])
 
   // Set Inactive when display closes / tab closes / navigates away
   useEffect(() => {
@@ -209,12 +351,40 @@ const DisplayPlayer = () => {
     if (!vehicleDocId) return
     const sendHeartbeat = async () => {
       try {
-        await updateDoc(doc(db, 'vehicles', vehicleDocId), {
+        const today = new Date().toISOString().split('T')[0]
+        const currentMonth = new Date().toISOString().slice(0, 7) // "2026-03"
+
+        // Check if we need to reset daily/monthly counters
+        const vehicleSnap = await getDoc(doc(db, 'vehicles', vehicleDocId))
+        const vehicleData = vehicleSnap.exists() ? vehicleSnap.data() : {}
+
+        const updates = {
           lastSeen: serverTimestamp(),
           status: 'Active',
           'displayDevice.lastHeartbeat': new Date().toISOString(),
           totalHoursOnline: increment(HEARTBEAT_MS / 3600000),
-        })
+        }
+
+        // Daily hours tracking
+        if (vehicleData.lastEarningsDate !== today) {
+          // New day - reset daily hours
+          updates.todayDisplayHours = HEARTBEAT_MS / 3600000
+          updates.lastEarningsDate = today
+        } else {
+          updates.todayDisplayHours = increment(HEARTBEAT_MS / 3600000)
+        }
+
+        // Monthly hours tracking
+        if (vehicleData.earningsMonth !== currentMonth) {
+          // New month - reset monthly
+          updates.monthDisplayHours = HEARTBEAT_MS / 3600000
+          updates.monthlyEarnings = 0
+          updates.earningsMonth = currentMonth
+        } else {
+          updates.monthDisplayHours = increment(HEARTBEAT_MS / 3600000)
+        }
+
+        await updateDoc(doc(db, 'vehicles', vehicleDocId), updates)
         setLastHeartbeat(new Date())
       } catch (e) { /* silent */ }
     }
@@ -444,6 +614,14 @@ const DisplayPlayer = () => {
                     <Clock className="w-4 h-4 text-white/40" />
                     <span className="text-white/60 text-xs font-mono">
                       {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+
+                  {/* Uptime */}
+                  <div className="flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-white/30" />
+                    <span className="text-white/40 text-[10px] font-mono">
+                      {Math.floor((Date.now() - uptimeStart) / 3600000)}h {Math.floor(((Date.now() - uptimeStart) % 3600000) / 60000)}m up
                     </span>
                   </div>
                 </div>

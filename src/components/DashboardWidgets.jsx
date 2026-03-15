@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Activity, Truck, Layers, Plus, BarChart3, TrendingUp, Eye, Clock, ArrowRight, Zap, Upload, CalendarClock } from 'lucide-react'
+import { Activity, Truck, Layers, Plus, BarChart3, TrendingUp, Eye, Clock, ArrowRight, Zap, Upload, CalendarClock, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
 
@@ -231,6 +231,154 @@ export const QuickActionsWidget = () => {
           )
         })}
       </div>
+    </WidgetCard>
+  )
+}
+
+// Widget 5: Driver Earnings
+export const DriverEarningsWidget = () => {
+  const [vehicles, setVehicles] = useState([])
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'vehicles'), (snap) => {
+      setVehicles(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    }, () => {})
+    return unsub
+  }, [])
+
+  const today = new Date().toISOString().slice(0, 10)
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const dayOfMonth = new Date().getDate()
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
+  const monthProgress = Math.round((dayOfMonth / daysInMonth) * 100)
+
+  const driverData = vehicles.map(v => {
+    const contractRate = v.contractRate || 0
+    const requiredHours = v.requiredHoursPerDay || 8
+    const todayHours = (v.lastEarningsDate === today ? v.todayDisplayHours : 0) || 0
+    const monthHours = (v.earningsMonth === currentMonth ? v.monthDisplayHours : 0) || 0
+
+    const dailyRate = contractRate / 30
+    const dailyProgress = Math.min(todayHours / requiredHours, 1)
+    const todayEarnings = dailyProgress * dailyRate
+
+    // Monthly earnings: approximate from monthHours vs expected
+    const expectedMonthHours = dayOfMonth * requiredHours
+    const monthlyEarningsRatio = expectedMonthHours > 0 ? Math.min(monthHours / expectedMonthHours, 1) : 0
+    const monthlyEarnings = monthlyEarningsRatio * dayOfMonth * dailyRate
+
+    const onTrack = dailyProgress >= 1
+
+    return {
+      id: v.id,
+      ownerName: v.ownerName || 'Unknown',
+      carId: v.carId || v.id,
+      vehicleName: v.vehicleName || 'N/A',
+      contractRate,
+      requiredHours,
+      todayHours,
+      dailyProgress,
+      todayEarnings,
+      monthlyEarnings,
+      onTrack,
+    }
+  })
+
+  const totalMonthlyObligation = driverData.reduce((sum, d) => sum + d.contractRate, 0)
+  const totalMonthlyEarned = driverData.reduce((sum, d) => sum + d.monthlyEarnings, 0)
+
+  const formatPKR = (amount) => `Rs ${Math.round(amount).toLocaleString()}`
+
+  return (
+    <WidgetCard title="Driver Earnings" icon={DollarSign} color="#059669">
+      {/* Summary Bar */}
+      <div className="flex flex-wrap items-center gap-4 mb-5 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200/50 dark:border-emerald-700/30">
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Monthly Obligation</p>
+          <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{formatPKR(totalMonthlyObligation)}</p>
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Earned This Month</p>
+          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatPKR(totalMonthlyEarned)}</p>
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Month Progress</p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-500" style={{ width: `${monthProgress}%` }} />
+            </div>
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{monthProgress}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Driver Cards Grid */}
+      {driverData.length === 0 ? (
+        <p className="text-xs text-slate-400 text-center py-4">No vehicles found</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[480px] overflow-y-auto pr-1">
+          {driverData.map((driver, i) => (
+            <motion.div
+              key={driver.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: i * 0.05 }}
+              whileHover={{ y: -4, boxShadow: '0 12px 40px rgba(0,0,0,0.12)' }}
+              className="relative rounded-xl border border-slate-200/60 dark:border-slate-700/60 overflow-hidden transition-all duration-300"
+              style={{
+                background: 'rgba(255,255,255,0.6)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+              }}
+            >
+              {/* Left gradient accent */}
+              <div className={`absolute top-0 left-0 bottom-0 w-1 ${driver.onTrack ? 'bg-gradient-to-b from-emerald-400 to-green-500' : 'bg-gradient-to-b from-amber-400 to-orange-500'}`} />
+
+              <div className="p-3 pl-4">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{driver.ownerName}</p>
+                    <p className="text-[10px] text-slate-400">{driver.carId} - {driver.vehicleName}</p>
+                  </div>
+                  <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${driver.onTrack ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                    {driver.onTrack ? <CheckCircle className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                    {driver.onTrack ? 'On Track' : 'Behind'}
+                  </span>
+                </div>
+
+                {/* Contract Rate */}
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                  Contract: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatPKR(driver.contractRate)}/month</span>
+                </p>
+
+                {/* Today's Hours Progress */}
+                <div className="mb-2">
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="text-slate-500 dark:text-slate-400">Today: {driver.todayHours.toFixed(1)}h / {driver.requiredHours}h</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{formatPKR(driver.todayEarnings)}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.round(driver.dailyProgress * 100)}%` }}
+                      transition={{ duration: 0.8, delay: i * 0.05 }}
+                      className={`h-full rounded-full ${driver.onTrack ? 'bg-gradient-to-r from-emerald-400 to-green-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Monthly Earnings */}
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500 dark:text-slate-400">Monthly Earned</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatPKR(driver.monthlyEarnings)}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </WidgetCard>
   )
 }

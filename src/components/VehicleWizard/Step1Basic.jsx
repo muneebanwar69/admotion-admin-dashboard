@@ -12,6 +12,7 @@ import {
   Hash,
   Building,
   Truck,
+  DollarSign,
 } from "lucide-react";
 
 const types = [
@@ -241,6 +242,45 @@ const Step1Basic = ({ carId, data, onChange }) => {
                 </option>
               ))}
             </select>
+          </div>
+        </motion.div>
+
+        {/* Contract Rate */}
+        <motion.div variants={itemVariants}>
+          <label className={labelClass}>
+            Contract Rate{" "}
+            <span className="text-xs text-gray-500 dark:text-gray-400">(PKR/Month)</span>
+          </label>
+          <div className="relative">
+            <IconWrapper icon={DollarSign} />
+            <input
+              type="number"
+              value={data.contractRate || ""}
+              onChange={(e) => set("contractRate", e.target.value)}
+              placeholder="e.g., 30000"
+              className={inputBase}
+              min="0"
+            />
+          </div>
+        </motion.div>
+
+        {/* Required Hours/Day */}
+        <motion.div variants={itemVariants}>
+          <label className={labelClass}>
+            Required Hours/Day{" "}
+            <span className="text-xs text-gray-500 dark:text-gray-400">(for earning)</span>
+          </label>
+          <div className="relative">
+            <IconWrapper icon={Clock} />
+            <input
+              type="number"
+              value={data.requiredHoursPerDay || ""}
+              onChange={(e) => set("requiredHoursPerDay", e.target.value)}
+              placeholder="e.g., 8"
+              className={inputBase}
+              min="1"
+              max="24"
+            />
           </div>
         </motion.div>
 

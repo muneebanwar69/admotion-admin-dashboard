@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
-import { Car, Wallet, Clock, Activity, TrendingUp, Zap, Eye, MapPin, Sun, Moon, CloudSun, Radio, Wifi, WifiOff } from 'lucide-react'
+import { Car, Wallet, Clock, Activity, TrendingUp, Zap, Eye, Sun, Moon, CloudSun, Radio, Wifi, WifiOff, Target, Award } from 'lucide-react'
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useDriverAuth } from '../../contexts/DriverAuthContext'
 
 /* ─── Helpers ─── */
+const fmt = (n) => Math.round(n).toLocaleString()
+
 const getGreeting = () => {
   const hour = new Date().getHours()
   if (hour < 12) return { text: 'Good Morning', icon: Sun }
@@ -14,25 +16,24 @@ const getGreeting = () => {
 }
 
 /* Smooth animated counter with easing */
-const AnimatedCounter = ({ value, prefix = '', suffix = '' }) => {
+const AnimatedCounter = ({ value, prefix = '', suffix = '', decimals = 0 }) => {
   const [display, setDisplay] = useState(0)
   useEffect(() => {
-    const target = parseInt(value) || 0
+    const target = parseFloat(value) || 0
     if (target === 0) { setDisplay(0); return }
     const duration = 1200
     const start = performance.now()
-    const from = 0
     const step = (now) => {
       const elapsed = now - start
       const progress = Math.min(elapsed / duration, 1)
-      // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplay(Math.floor(from + (target - from) * eased))
+      const current = target * eased
+      setDisplay(decimals > 0 ? parseFloat(current.toFixed(decimals)) : Math.floor(current))
       if (progress < 1) requestAnimationFrame(step)
     }
     requestAnimationFrame(step)
-  }, [value])
-  return <>{prefix}{display.toLocaleString()}{suffix}</>
+  }, [value, decimals])
+  return <>{prefix}{decimals > 0 ? display.toFixed(decimals) : display.toLocaleString()}{suffix}</>
 }
 
 /* Floating decorative particles */
@@ -74,8 +75,89 @@ const ShimmerCard = () => (
   </div>
 )
 
+/* ─── Earnings Progress Ring (SVG) ─── */
+const EarningsRing = ({ percent, todayEarnings, dailyRate, inView }) => {
+  const size = 180
+  const stroke = 12
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const capped = Math.min(percent, 100)
+  const offset = circumference - (capped / 100) * circumference
+
+  // color based on progress
+  const ringColor = capped >= 100 ? '#10b981' : capped >= 60 ? '#3b82f6' : '#f59e0b'
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative">
+        <svg width={size} height={size} className="transform -rotate-90 drop-shadow-lg">
+          {/* Background track */}
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke="currentColor" strokeWidth={stroke}
+            className="text-white/10"
+          />
+          {/* Glow behind progress */}
+          <motion.circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke={ringColor} strokeWidth={stroke + 6} strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={inView ? { strokeDashoffset: offset } : {}}
+            transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+            opacity={0.2}
+            style={{ filter: 'blur(6px)' }}
+          />
+          {/* Main progress arc */}
+          <motion.circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke={ringColor} strokeWidth={stroke} strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={inView ? { strokeDashoffset: offset } : {}}
+            transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+          />
+        </svg>
+        {/* Center content */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={inView ? { opacity: 1, scale: 1 } : {}}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            className="text-center"
+          >
+            <p className="text-[10px] uppercase tracking-wider text-white/50 font-medium">Earned Today</p>
+            <p className="text-2xl font-bold text-white mt-0.5">
+              <AnimatedCounter value={todayEarnings} prefix="Rs " />
+            </p>
+            <p className="text-[10px] text-white/40 mt-0.5">of Rs {fmt(dailyRate)}</p>
+          </motion.div>
+        </div>
+      </div>
+      {/* Percentage label */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={inView ? { opacity: 1, y: 0 } : {}}
+        transition={{ delay: 0.8 }}
+        className="mt-2 flex items-center gap-1.5"
+      >
+        <Target className="w-3.5 h-3.5 text-amber-300" />
+        <span className="text-sm font-semibold text-white/80">{Math.round(capped)}% of daily target</span>
+        {capped >= 100 && (
+          <motion.span
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            <Award className="w-4 h-4 text-emerald-400" />
+          </motion.span>
+        )}
+      </motion.div>
+    </div>
+  )
+}
+
 /* 3D Tilt stat card */
-const StatCard = ({ icon: Icon, label, value, prefix, suffix, color, delay = 0 }) => {
+const StatCard = ({ icon: Icon, label, value, prefix, suffix, color, delay = 0, decimals = 0, subtext, children }) => {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-40px' })
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
@@ -100,6 +182,7 @@ const StatCard = ({ icon: Icon, label, value, prefix, suffix, color, delay = 0 }
         transform: `perspective(600px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
         transition: 'transform 0.15s ease-out',
       }}
+      whileTap={{ scale: 0.97 }}
       className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/40 dark:border-slate-700/50 cursor-default group"
     >
       <div className="flex items-center gap-3">
@@ -113,10 +196,12 @@ const StatCard = ({ icon: Icon, label, value, prefix, suffix, color, delay = 0 }
         <div className="flex-1 min-w-0">
           <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{label}</p>
           <p className="text-xl font-bold text-slate-800 dark:text-white">
-            {inView ? <AnimatedCounter value={value} prefix={prefix} suffix={suffix} /> : `${prefix || ''}0${suffix || ''}`}
+            {inView ? <AnimatedCounter value={value} prefix={prefix} suffix={suffix} decimals={decimals} /> : `${prefix || ''}0${suffix || ''}`}
           </p>
+          {subtext && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{subtext}</p>}
         </div>
       </div>
+      {children}
     </motion.div>
   )
 }
@@ -126,26 +211,39 @@ const DriverDashboard = () => {
   const { driver } = useDriverAuth()
   const [vehicle, setVehicle] = useState(null)
   const [currentAds, setCurrentAds] = useState([])
-  const [earnings, setEarnings] = useState({ today: 0, month: 0, pending: 0 })
-  const [stats, setStats] = useState({ impressions: 0, hoursOnline: 0, uptime: 0 })
   const [vehicleOnline, setVehicleOnline] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const greeting = getGreeting()
   const GreetingIcon = greeting.icon
+
+  const heroRef = useRef(null)
+  const heroInView = useInView(heroRef, { once: true, margin: '-20px' })
   const vehicleRef = useRef(null)
   const vehicleInView = useInView(vehicleRef, { once: true, margin: '-30px' })
   const adsRef = useRef(null)
   const adsInView = useInView(adsRef, { once: true, margin: '-30px' })
+  const progressRef = useRef(null)
+  const progressInView = useInView(progressRef, { once: true, margin: '-30px' })
 
-  // Listen to assigned vehicle
+  // ── Compute earnings from vehicle doc fields ──
+  const contractRate = vehicle?.contractRate || 0
+  const requiredHoursPerDay = vehicle?.requiredHoursPerDay || 8
+  const todayDisplayHours = vehicle?.todayDisplayHours || 0
+  const monthDisplayHours = vehicle?.monthDisplayHours || 0
+
+  const dailyRate = contractRate / 30
+  const todayEarnings = Math.min(todayDisplayHours / requiredHoursPerDay, 1) * dailyRate
+  const monthEarnings = Math.min((monthDisplayHours / (requiredHoursPerDay * 30)) * contractRate, contractRate)
+  const dailyProgressPercent = Math.min((todayDisplayHours / requiredHoursPerDay) * 100, 100)
+
+  // ── Listen to vehicle doc (driver.uid = vehicle doc id) ──
   useEffect(() => {
-    if (!driver?.assignedVehicleId) { setLoading(false); return }
-    const unsub = onSnapshot(doc(db, 'vehicles', driver.assignedVehicleId), (snap) => {
+    if (!driver?.uid) { setLoading(false); return }
+    const unsub = onSnapshot(doc(db, 'vehicles', driver.uid), (snap) => {
       if (snap.exists()) {
         const data = { id: snap.id, ...snap.data() }
         setVehicle(data)
-        // Check both status field AND lastSeen freshness (within 2 min = heartbeat window)
         const lastSeen = data.lastSeen?.toDate?.()
         const isFresh = lastSeen && (Date.now() - lastSeen.getTime()) < 2 * 60 * 1000
         setVehicleOnline(data.status === 'Active' && isFresh !== false)
@@ -153,46 +251,29 @@ const DriverDashboard = () => {
       setLoading(false)
     })
     return () => unsub()
-  }, [driver?.assignedVehicleId])
-
-  // Listen to vehicle record for earnings/stats
-  useEffect(() => {
-    if (!driver?.uid) return
-    const unsub = onSnapshot(doc(db, 'vehicles', driver.uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data()
-        setEarnings({
-          today: data.todayEarnings || 0,
-          month: data.currentMonthEarnings || 0,
-          pending: data.pendingPayout || 0,
-        })
-        setStats({
-          impressions: data.totalImpressions || 0,
-          hoursOnline: data.totalHoursOnline || 0,
-          uptime: data.adUptime || 0,
-        })
-      }
-    })
-    return () => unsub()
   }, [driver?.uid])
 
-  // Listen to current ads
+  // ── Listen to current ads ──
   useEffect(() => {
-    if (!driver?.assignedVehicleId) return
+    if (!driver?.uid) return
     const q = query(
       collection(db, 'assignments'),
-      where('vehicleId', '==', driver.assignedVehicleId)
+      where('vehicleId', '==', driver.uid)
     )
     const unsub = onSnapshot(q, (snap) => {
       setCurrentAds(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     return () => unsub()
-  }, [driver?.assignedVehicleId])
+  }, [driver?.uid])
+
+  // Progress bar milestone markers
+  const milestones = [25, 50, 75, 100]
 
   return (
     <div className="space-y-5">
-      {/* ─── Hero Greeting Card ─── */}
+      {/* ─── Hero Greeting Card with Earnings Ring ─── */}
       <motion.div
+        ref={heroRef}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -229,7 +310,7 @@ const DriverDashboard = () => {
             {driver?.name || 'Driver'}
           </motion.h1>
           <motion.div
-            className="flex items-center gap-3 text-white/50 text-sm"
+            className="flex items-center gap-3 text-white/50 text-sm mb-5"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -257,22 +338,167 @@ const DriverDashboard = () => {
               )}
             </span>
           </motion.div>
+
+          {/* Earnings Ring */}
+          <EarningsRing
+            percent={dailyProgressPercent}
+            todayEarnings={todayEarnings}
+            dailyRate={dailyRate}
+            inView={heroInView}
+          />
         </div>
       </motion.div>
 
-      {/* ─── Stats Grid ─── */}
+      {/* ─── Stats Grid (2x2) ─── */}
       {loading ? (
         <div className="grid grid-cols-2 gap-3">
           {[1, 2, 3, 4].map(i => <ShimmerCard key={i} />)}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <StatCard icon={Wallet} label="Today's Earnings" value={earnings.today} prefix="Rs " color="bg-gradient-to-br from-emerald-500 to-emerald-600" delay={0.1} />
-          <StatCard icon={TrendingUp} label="This Month" value={earnings.month} prefix="Rs " color="bg-gradient-to-br from-blue-500 to-blue-600" delay={0.15} />
-          <StatCard icon={Eye} label="Impressions" value={stats.impressions} color="bg-gradient-to-br from-violet-500 to-violet-600" delay={0.2} />
-          <StatCard icon={Clock} label="Hours Online" value={stats.hoursOnline} suffix="h" color="bg-gradient-to-br from-amber-500 to-amber-600" delay={0.25} />
+          <StatCard
+            icon={Wallet}
+            label="Today's Earnings"
+            value={todayEarnings}
+            prefix="Rs "
+            color="bg-gradient-to-br from-emerald-500 to-emerald-600"
+            delay={0.1}
+            subtext={`${todayDisplayHours.toFixed(1)}h of ${requiredHoursPerDay}h displayed`}
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Monthly Earnings"
+            value={monthEarnings}
+            prefix="Rs "
+            color="bg-gradient-to-br from-blue-500 to-blue-600"
+            delay={0.15}
+            subtext={`${monthDisplayHours.toFixed(1)}h this month`}
+          />
+          <StatCard
+            icon={Eye}
+            label="Display Hours Today"
+            value={todayDisplayHours}
+            suffix="h"
+            decimals={1}
+            color="bg-gradient-to-br from-violet-500 to-violet-600"
+            delay={0.2}
+            subtext={`Target: ${requiredHoursPerDay}h`}
+          >
+            {/* Mini progress bar inside card */}
+            <div className="mt-2.5">
+              <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((todayDisplayHours / requiredHoursPerDay) * 100, 100)}%` }}
+                  transition={{ duration: 1, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                />
+              </div>
+            </div>
+          </StatCard>
+          <StatCard
+            icon={Award}
+            label="Contract Rate"
+            value={contractRate}
+            prefix="Rs "
+            suffix="/mo"
+            color="bg-gradient-to-br from-amber-500 to-amber-600"
+            delay={0.25}
+            subtext={`Rs ${fmt(dailyRate)}/day`}
+          />
         </div>
       )}
+
+      {/* ─── Daily Progress Section ─── */}
+      <motion.div
+        ref={progressRef}
+        initial={{ opacity: 0, y: 30 }}
+        animate={progressInView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.5 }}
+        className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/40 dark:border-slate-700/50 overflow-hidden"
+      >
+        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+            <Target className="w-4 h-4 text-blue-500" />
+            Daily Display Progress
+          </h2>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {todayDisplayHours.toFixed(1)}h / {requiredHoursPerDay}h
+          </span>
+        </div>
+        <div className="p-4 space-y-3">
+          {/* Progress bar with milestones */}
+          <div className="relative">
+            <div className="w-full h-4 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden relative">
+              <motion.div
+                className="h-full rounded-full relative"
+                style={{
+                  background: dailyProgressPercent >= 100
+                    ? 'linear-gradient(90deg, #10b981, #34d399)'
+                    : dailyProgressPercent >= 60
+                    ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
+                    : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                }}
+                initial={{ width: 0 }}
+                animate={progressInView ? { width: `${Math.min(dailyProgressPercent, 100)}%` } : {}}
+                transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+              >
+                {/* Shimmer effect on bar */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2s_infinite]" />
+              </motion.div>
+            </div>
+            {/* Milestone markers */}
+            <div className="absolute inset-0 flex items-center pointer-events-none">
+              {milestones.map(m => (
+                <div
+                  key={m}
+                  className="absolute top-0 bottom-0 flex items-center"
+                  style={{ left: `${m}%`, transform: 'translateX(-50%)' }}
+                >
+                  <div className={`w-0.5 h-5 rounded-full ${
+                    dailyProgressPercent >= m
+                      ? 'bg-white/60'
+                      : 'bg-slate-300 dark:bg-slate-600'
+                  }`} />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Milestone labels */}
+          <div className="flex justify-between px-1">
+            {milestones.map(m => {
+              const hrs = (m / 100) * requiredHoursPerDay
+              return (
+                <span
+                  key={m}
+                  className={`text-[10px] font-medium ${
+                    dailyProgressPercent >= m
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}
+                >
+                  {hrs}h
+                </span>
+              )
+            })}
+          </div>
+          {/* Earning status text */}
+          <div className="flex items-center justify-between bg-slate-50/80 dark:bg-slate-700/30 rounded-xl px-3 py-2.5">
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Earnings rate</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-white">
+                Rs {fmt(dailyRate)} / {requiredHoursPerDay}h
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remaining</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-white">
+                {Math.max(requiredHoursPerDay - todayDisplayHours, 0).toFixed(1)}h to go
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       {/* ─── Vehicle Status Card ─── */}
       <motion.div
@@ -309,8 +535,8 @@ const DriverDashboard = () => {
               {[
                 { label: 'Vehicle', value: vehicle.vehicleName || 'N/A' },
                 { label: 'Plate', value: vehicle.plateNumber || driver?.assignedVehiclePlate || 'N/A' },
+                { label: 'Total Online', value: `${(vehicle.totalHoursOnline || 0).toFixed(1)}h` },
                 { label: 'Screen', value: vehicle.displayDevice?.screenResolution || 'Standard' },
-                { label: 'Ad Uptime', value: `${stats.uptime}%` },
               ].map((item, i) => (
                 <motion.div
                   key={item.label}
@@ -394,37 +620,6 @@ const DriverDashboard = () => {
           )}
         </div>
       </motion.div>
-
-      {/* ─── Pending Payout ─── */}
-      {earnings.pending > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="relative rounded-2xl p-4 border border-amber-200/50 dark:border-amber-700/30 overflow-hidden"
-        >
-          {/* Animated gradient border effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20" />
-          <div className="absolute inset-0 opacity-40" style={{
-            background: 'radial-gradient(circle at 90% 50%, rgba(245,158,11,0.2) 0%, transparent 60%)',
-          }} />
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wider">Pending Payout</p>
-              <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 mt-1">
-                <AnimatedCounter value={earnings.pending} prefix="Rs " />
-              </p>
-            </div>
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center"
-            >
-              <Wallet className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-            </motion.div>
-          </div>
-        </motion.div>
-      )}
 
       {/* Shimmer keyframe */}
       <style>{`

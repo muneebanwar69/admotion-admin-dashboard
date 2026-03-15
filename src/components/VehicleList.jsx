@@ -173,34 +173,28 @@ const VehicleList = ({ vehicles, onAdd, onEdit, onAskDelete, onChat }) => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
+                          <button
                             onClick={() => onEdit(v)}
-                            className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-all duration-200"
-                            title="Edit"
+                            title="Edit vehicle"
+                            className="group relative p-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                           >
-                            <Pencil size={16} />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
+                            <Pencil className="w-4 h-4 transition-transform group-hover:rotate-12" />
+                          </button>
+                          <button
                             onClick={() => onAskDelete(v.id || v.carId)}
-                            className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200"
-                            title="Delete"
+                            title="Delete vehicle"
+                            className="group relative p-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                           >
-                            <Trash2 size={16} />
-                          </motion.button>
+                            <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                          </button>
                           {onChat && (
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.95 }}
+                            <button
                               onClick={() => onChat(v)}
-                              className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-900/50 transition-all duration-200"
-                              title="Chat with driver"
+                              title={`Chat with ${v.ownerName || 'driver'}`}
+                              className="group relative p-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-500/25 hover:shadow-xl hover:shadow-teal-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
                             >
-                              <MessageCircle size={16} />
-                            </motion.button>
+                              <MessageCircle className="w-4 h-4 transition-transform group-hover:scale-110" />
+                            </button>
                           )}
                         </div>
                       </td>

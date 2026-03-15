@@ -10,6 +10,7 @@ const DEFAULT_LAYOUT = [
   { id: 'utilization', label: 'Fleet Utilization', icon: 'Truck', visible: false, order: 4 },
   { id: 'top-ads', label: 'Top Performing Ads', icon: 'Zap', visible: false, order: 5 },
   { id: 'quick-actions', label: 'Quick Actions', icon: 'Layers', visible: false, order: 6 },
+  { id: 'driver-earnings', label: 'Driver Earnings', icon: 'DollarSign', visible: true, order: 7 },
 ]
 
 function loadLayout() {

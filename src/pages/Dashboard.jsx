@@ -9,7 +9,7 @@ import { SkeletonKpiCard } from '../components/ui/SkeletonLoader'
 import RealTimeIndicator from '../components/ui/RealTimeIndicator'
 import DashboardCustomizer from '../components/DashboardCustomizer'
 import useDashboardLayout from '../hooks/useDashboardLayout'
-import { FleetUtilizationWidget, TopAdsWidget, QuickActionsWidget } from '../components/DashboardWidgets'
+import { FleetUtilizationWidget, TopAdsWidget, QuickActionsWidget, DriverEarningsWidget } from '../components/DashboardWidgets'
 
 // Geocoding cache
 const geocodeCache = new Map()
@@ -383,6 +383,8 @@ const Dashboard = () => {
         return <div key="top-ads" className="mb-6"><TopAdsWidget /></div>
       case 'quick-actions':
         return <div key="quick-actions" className="mb-6"><QuickActionsWidget /></div>
+      case 'driver-earnings':
+        return <div key="driver-earnings" className="mb-6"><DriverEarningsWidget /></div>
       default:
         return null
     }
