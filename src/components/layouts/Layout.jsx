@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Menu, LogOut, BarChart3, Bell, User, Truck, LayoutDashboard, Layers, Sun, Moon, Shield, CalendarClock, ChevronRight, PanelLeftClose, PanelLeft, FileText, Settings } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import VoiceCommand from '../VoiceCommand'
 
 /**
  * App-wide layout with persistent Sidebar + Top Header
@@ -138,6 +139,9 @@ const Layout = ({ children }) => {
 
         {/* Right Section */}
         <div className='ml-auto flex items-center gap-2 sm:gap-3 relative z-10'>
+          {/* Voice Command */}
+          <VoiceCommand />
+
           {/* Theme Toggle */}
           <button
             aria-label='Toggle theme'

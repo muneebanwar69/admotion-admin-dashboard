@@ -14,7 +14,8 @@
       "Bash(cd D:/fyp && npx vite build 2>&1 | tail -5)",
       "Bash(cd:*)",
       "Bash(where vercel:*)",
-      "Read(//d//**)"
+      "Read(//d//**)",
+      "Bash(ls:*)"
     ]
   }
 }

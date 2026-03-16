@@ -46,6 +46,9 @@ const DriverProfile = lazy(() => import('./pages/driver/DriverProfile'))
 const DisplaySetup = lazy(() => import('./pages/display/DisplaySetup'))
 const DisplayPlayer = lazy(() => import('./pages/display/DisplayPlayer'))
 
+// Public landing page
+const PublicSite = lazy(() => import('./pages/PublicSite'))
+
 // Protected Route Component (Admin)
 function ProtectedRoute({ children }) {
   const { currentUser } = useAuth()
@@ -129,6 +132,9 @@ function DriverAppRoutes() {
   return (
     <Suspense fallback={<DriverPageLoader />}>
       <Routes>
+        {/* Public landing page */}
+        <Route path="/site" element={<PublicSite />} />
+
         {/* Vehicle Display routes (kiosk mode - no auth wrapper) */}
         <Route path="/display/setup" element={<DisplaySetup />} />
         <Route path="/display/play" element={<DisplayPlayer />} />
