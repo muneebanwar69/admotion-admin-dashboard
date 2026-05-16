@@ -24,6 +24,7 @@
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.26.1",
     "react-window": "^1.8.10",
+    "recharts": "^3.8.1",
     "three": "^0.160.0",
     "uuid": "^11.1.0"
   },

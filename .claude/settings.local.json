@@ -15,7 +15,9 @@
       "Bash(cd:*)",
       "Bash(where vercel:*)",
       "Read(//d//**)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx vercel:*)",
+      "Bash(vercel ls:*)"
     ]
   }
 }

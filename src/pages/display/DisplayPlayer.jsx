@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Monitor, Wifi, WifiOff, Zap, Clock, Shield } from 'lucide-react'
-import { doc, onSnapshot, updateDoc, serverTimestamp, collection, addDoc, getDoc, increment } from 'firebase/firestore'
+import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, increment } from 'firebase/firestore'
 import { db } from '../../firebase'
+import { logImpression } from '../../services/impressions'
 
 // Swap manifest for display-specific PWA
 const useDisplayManifest = () => {
@@ -48,6 +49,7 @@ const DisplayPlayer = () => {
   const videoRef = useRef(null)
   const timerRef = useRef(null)
   const wakeLockRef = useRef(null)
+  const lastGpsRef = useRef(null) // { lat, lon } - latest known position for impressions
 
   // ─── Redirect if not setup ───
   useEffect(() => {
@@ -346,19 +348,15 @@ const DisplayPlayer = () => {
     const currentAd = ads[currentIndex % ads.length]
     if (!currentAd?.adId) return
 
-    const logImpression = async () => {
-      try {
-        await addDoc(collection(db, 'impressions'), {
-          adId: currentAd.adId,
-          vehicleId: vehicleDocId,
-          carId: vehicleCarId,
-          duration: AD_DURATION_DEFAULT / 1000,
-          timestamp: serverTimestamp(),
-          date: new Date().toISOString().split('T')[0],
-        })
-      } catch (e) { /* silent - might fail offline */ }
-    }
-    logImpression()
+    const gps = lastGpsRef.current
+    logImpression({
+      adId: currentAd.adId,
+      vehicleId: vehicleDocId,
+      carId: vehicleCarId,
+      lat: gps?.lat,
+      lon: gps?.lon,
+      duration: AD_DURATION_DEFAULT / 1000,
+    })
   }, [currentIndex, vehicleDocId])
 
   // Heartbeat
@@ -414,6 +412,7 @@ const DisplayPlayer = () => {
     const sendGPS = () => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
+          lastGpsRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude }
           try {
             await updateDoc(doc(db, 'vehicles', vehicleDocId), {
               currentLocation: {

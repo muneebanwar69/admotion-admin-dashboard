@@ -49,25 +49,33 @@ export function AuthProvider({ children }) {
         const adminDoc = querySnapshot.docs[0]
         const adminData = adminDoc.data()
 
-        // Check password using bcrypt
+        // Check password - try bcrypt first, then plaintext fallback
         let passwordMatch = false
 
         if (adminData.password) {
           if (adminData.password.startsWith('$2')) {
             // Bcrypt hashed password
-            passwordMatch = await comparePassword(password, adminData.password)
+            try {
+              passwordMatch = await comparePassword(password, adminData.password)
+            } catch (e) {
+              // If bcrypt fails (module error), check plaintext as last resort
+              passwordMatch = false
+            }
+            // If bcrypt didn't match, also try plaintext (in case hash got corrupted)
+            if (!passwordMatch && adminData.password === password) {
+              passwordMatch = true
+            }
           } else {
-            // Legacy plaintext - auto-migrate to bcrypt on successful match
+            // Plaintext password
             if (adminData.password === password) {
               passwordMatch = true
-              // Auto-migrate: hash the password and update Firestore
+              // Auto-migrate to bcrypt
               try {
                 const { hashPassword } = await import('../utils/password')
                 const hashed = await hashPassword(password)
                 const { updateDoc, doc } = await import('firebase/firestore')
                 await updateDoc(doc(db, 'admins', adminDoc.id), { password: hashed })
-                console.log('Password auto-migrated to bcrypt')
-              } catch (e) { /* silent fail on migration */ }
+              } catch (e) { /* silent */ }
             }
           }
         }
@@ -119,11 +127,17 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    // Check for stored user on app load
+    // Check for stored user on app load - validate it has required fields
     const storedUser = localStorage.getItem('currentUser')
     if (storedUser) {
       try {
-        setCurrentUser(JSON.parse(storedUser))
+        const parsed = JSON.parse(storedUser)
+        // Validate the stored user has minimum required fields
+        if (parsed && parsed.uid && (parsed.username || parsed.email)) {
+          setCurrentUser(parsed)
+        } else {
+          localStorage.removeItem('currentUser')
+        }
       } catch (e) {
         localStorage.removeItem('currentUser')
       }

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -10,6 +11,8 @@ import json
 import logging
 import httpx
 from dotenv import load_dotenv
+
+from impression_engine import impression_model, train_from_rows
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -76,6 +79,9 @@ class ImpressionRequest(BaseModel):
     vehicleId: str
     duration: float = Field(ge=0, description="Duration in seconds")
     screenType: str = "exterior"
+    adPlays: int = Field(default=1, ge=1, description="Number of ad plays in this batch")
+    lat: Optional[float] = Field(default=None, description="Vehicle latitude at play time")
+    lon: Optional[float] = Field(default=None, description="Vehicle longitude at play time")
 
 
 class SchedulerStatusResponse(BaseModel):
@@ -734,28 +740,106 @@ async def get_scheduler_status():
 
 @app.post("/api/impressions")
 async def record_impression(payload: ImpressionRequest):
-    """Record an ad impression from a vehicle screen."""
+    """
+    Record an ad impression and estimate its real-world reach.
+
+    Enriches the raw ad play with GPS-derived location, time slot and weather,
+    then computes an estimated number of people reached. The stored document
+    is fully explainable and doubles as a labelled training row for the
+    impression ML model.
+    """
     try:
+        now = _utcnow()
+
+        # 1. Resolve location context from GPS (if provided)
+        has_gps = payload.lat is not None and payload.lon is not None
+        vehicle_city = vehicle_area = None
+        if has_gps:
+            vehicle_city = detect_city(payload.lat, payload.lon)
+            if vehicle_city:
+                vehicle_area = detect_area(payload.lat, payload.lon, vehicle_city)
+
+        # 2. Resolve weather for the city (cached, falls back to sunny)
+        weather_category = "sunny"
+        if vehicle_city:
+            try:
+                weather = await fetch_weather(vehicle_city)
+                weather_category = weather.get("category", "sunny")
+            except Exception:
+                pass
+
+        # 3. Estimate reach (ML model if trained, else heuristic fallback)
+        estimate = impression_model.predict(
+            ad_plays=payload.adPlays,
+            area_name=vehicle_area,
+            has_gps=has_gps,
+            weather_category=weather_category,
+            now=now,
+        )
+
+        # 4. Persist a rich, ML-ready impression document
         doc_data = {
             "adId": payload.adId,
             "vehicleId": payload.vehicleId,
             "duration": payload.duration,
             "screenType": payload.screenType,
+            "city": vehicle_city or "",
+            "area": vehicle_area or "",
+            "weather": weather_category,
+            "timeSlot": get_current_time_slot(now),
+            **estimate,  # estimatedReach, areaType, *Factor, hour, method, ...
+            "lat": payload.lat,
+            "lon": payload.lon,
             "timestamp": firestore.SERVER_TIMESTAMP,
-            "recordedAt": _utcnow().isoformat(),
+            "recordedAt": now.isoformat(),
+            "date": now.strftime("%Y-%m-%d"),
         }
         db.collection("impressions").add(doc_data)
 
-        # Also increment the ad's spent field (cost_per_impression per view)
+        # 5. Charge spend per estimated person reached (not per raw play)
         try:
+            spend = round(estimate["estimatedReach"] * COST_PER_IMPRESSION, 2)
             ad_ref = db.collection("ads").document(payload.adId)
-            ad_ref.update({"spent": firestore.Increment(COST_PER_IMPRESSION)})
+            ad_ref.update({"spent": firestore.Increment(spend)})
         except Exception:
             pass  # Non-critical; ad might not have a spent field yet
 
-        return {"ok": True, "message": "Impression recorded"}
+        return {
+            "ok": True,
+            "message": "Impression recorded",
+            "estimatedReach": estimate["estimatedReach"],
+            "method": estimate["method"],
+            "city": vehicle_city,
+            "area": vehicle_area,
+        }
     except Exception as exc:
         logger.error("Failed to record impression: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/model/status")
+async def model_status():
+    """Report whether the impression ML model is trained or using heuristic."""
+    return {
+        "ok": True,
+        "trained": impression_model.is_trained,
+        "mode": "ml" if impression_model.is_trained else "heuristic",
+    }
+
+
+@app.post("/api/model/train")
+async def train_model():
+    """
+    Train the impression model from accumulated `impressions` rows.
+    Admin-triggered; safe no-op until enough data has been collected.
+    """
+    try:
+        rows = [d.to_dict() for d in db.collection("impressions").stream()]
+        result = train_from_rows(rows)
+        status = 200 if result.get("ok") else 422
+        return JSONResponse(status_code=status, content=result)
+    except Exception as exc:
+        logger.error("Model training failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
