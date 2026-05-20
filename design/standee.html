@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AdMotion — FYP Standee (Clean)</title>
+<style>
+  @page { size: 850mm 2000mm; margin: 0; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body{ font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif; }
+
+  .standee{
+    width:850mm; height:2000mm; position:relative; overflow:hidden; color:#fff;
+    background: linear-gradient(168deg,#13205f 0%,#0e1a55 45%,#0a1142 100%);
+    padding:22mm 38mm; display:flex; flex-direction:column; justify-content:space-between; gap:5mm;
+  }
+  .glow{ display:none; }
+  .glow.a{ width:520mm;height:520mm; background:#f59e0b; top:-220mm; right:-210mm; opacity:.16;}
+  .glow.b{ width:480mm;height:480mm; background:#1d4ed8; bottom:-140mm; left:-200mm; opacity:.18;}
+  .z{ position:relative; z-index:2; }
+
+  .logobar{ background:#fff; border-radius:12mm; border:5mm solid #f59e0b; height:104mm;
+    align-self:center; display:inline-flex; align-items:center; gap:24mm; padding:9mm 26mm; }
+  .lg{ display:flex; align-items:center; justify-content:center; height:100%; }
+  .lg img{ height:100%; width:auto; max-width:100%; object-fit:contain; display:block; }
+  .lg .cap{ font-size:26pt; font-weight:900; color:#0d1550; text-align:center; }
+
+  .event{ text-align:center; }
+  .event .e1{ color:#fbbf24; font-size:54pt; font-weight:900; letter-spacing:2px; line-height:1.05; }
+  .event .e2{ color:#a5b4fc; font-size:31pt; font-weight:800; margin-top:5mm; letter-spacing:5px; }
+
+  .collab{ display:flex; align-items:center; justify-content:center; gap:16mm; }
+  .collab .lbl{ color:#a5b4fc; font-size:28pt; letter-spacing:6px; font-weight:800; }
+  .collab .pill{ display:flex; align-items:center; gap:11mm; background:#fff; color:#0d1550;
+    padding:8mm 22mm; border-radius:40mm; }
+  .collab .pill img{ height:42mm; object-fit:contain; }
+  .collab .pill b{ font-size:34pt; font-weight:900; letter-spacing:1px; }
+
+  .title-block{ text-align:center; }
+  .title{ font-size:124pt; font-weight:900; line-height:1; letter-spacing:1px; color:#fff; }
+  .title .amber{ color:#fbbf24; }
+  .subtitle{ font-size:40pt; font-weight:900; font-style:italic; margin-top:6mm; color:#fbbf24; }
+
+  .preview{ display:flex; gap:22mm; }
+  .shot{ flex:1; background:#0b1437; border:3mm solid #fbbf24; border-radius:11mm; overflow:hidden; }
+  .shot .bar{ height:16mm; background:#1b2a6b; display:flex; align-items:center; gap:7mm; padding:0 12mm; }
+  .shot .dot{ width:8mm;height:8mm;border-radius:50%;background:#64748b; }
+  .shot .dot.r{background:#fb7185;} .shot .dot.y{background:#fbbf24;} .shot .dot.g{background:#34d399;}
+  .shot img{ width:100%; height:132mm; object-fit:cover; object-position:top; display:block; }
+  .shot .cap{ text-align:center; font-size:28pt; font-weight:800; color:#fbbf24; padding:7mm; }
+
+  .desc{ text-align:center; font-size:38pt; line-height:1.45; color:#eaf0ff; max-width:740mm; margin:0 auto; font-weight:600; }
+  .desc b{ color:#fbbf24; }
+
+  .h{ font-size:46pt; font-weight:900; letter-spacing:2px; display:flex; align-items:center; gap:12mm; margin-bottom:7mm; color:#fff; }
+  .h .bar{ width:13mm; height:48mm; border-radius:3mm; background:#fbbf24; }
+  .h .amber{ color:#fbbf24; }
+
+  .ai-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14mm; }
+  .ai-card{ display:flex; gap:13mm; align-items:center; padding:11mm 18mm; border-radius:13mm;
+    background:rgba(255,255,255,.07); border-left:9mm solid #f59e0b; }
+  .ai-ic{ width:58mm;height:58mm;flex:none;border-radius:11mm; background:linear-gradient(135deg,#fde047,#f59e0b);
+    color:#0a1142; display:flex;align-items:center;justify-content:center;font-size:40pt; }
+  .ai-card .tt{ font-size:46pt; font-weight:900; color:#fff; line-height:1.1; }
+  .ai-card .dd{ font-size:29pt; color:#cfd8f5; margin-top:4mm; line-height:1.28; font-weight:600; }
+
+  .feat{ display:grid; grid-template-columns:1fr 1fr; gap:13mm; }
+  .feat li{ list-style:none; font-size:38pt; font-weight:800; color:#fff; padding:13mm 16mm 13mm 22mm;
+    border-radius:10mm; background:rgba(255,255,255,.07); border-left:8mm solid #fbbf24; }
+
+  .flow{ display:flex; align-items:flex-start; }
+  .step{ flex:1; text-align:center; position:relative; padding:0 5mm; }
+  .step .num{ width:56mm;height:56mm;border-radius:50%;margin:0 auto 8mm;
+    display:flex;align-items:center;justify-content:center; font-size:28pt;font-weight:900;color:#0a1142;
+    background:linear-gradient(135deg,#fde047,#f59e0b); }
+  .step .st{ font-size:40pt; font-weight:900; color:#fff; }
+  .step .sp{ font-size:30pt; color:#bcd0ff; margin-top:5mm; line-height:1.28; font-weight:600; }
+  .step:not(:last-child)::after{ content:"➜"; position:absolute; right:-7mm; top:15mm; font-size:32pt; color:#fbbf24; }
+
+  .tools{ display:flex; flex-wrap:wrap; gap:12mm; }
+  .tool{ display:flex; align-items:center; gap:8mm; background:#fff; color:#0a1142;
+    padding:11mm 22mm; border-radius:11mm; }
+  .tool img{ width:28mm; height:28mm; object-fit:contain; }
+  .tool b{ font-size:34pt; font-weight:900; }
+
+  .team{ display:flex; justify-content:center; align-items:stretch; gap:24mm; }
+  .person{ flex:1; display:flex; flex-direction:column; align-items:center; text-align:center;
+    background:rgba(255,255,255,.07); border-radius:14mm; padding:11mm 12mm; border-top:7mm solid #f59e0b; }
+  .pic{ width:118mm;height:118mm;border-radius:50%;overflow:hidden;border:6mm solid #fbbf24;
+    background:#101a5e; flex:none; margin-bottom:9mm; }
+  .pic img{ width:100%;height:100%;object-fit:cover;object-position:50% 18%; }
+  .pic .ph{ width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+    font-size:40pt;font-weight:900;color:#fde047;background:linear-gradient(135deg,#1e3a8a,#1d4ed8);}
+  .person .nm{ font-size:44pt;font-weight:900;color:#fff; }
+  .person .rl{ font-size:32pt;color:#fbbf24;font-weight:900;margin-top:3mm; }
+  .person .ro{ font-size:27pt;color:#a5b4fc;margin-top:2mm;font-weight:700; }
+
+  .footband{ background:linear-gradient(90deg,#fde047,#f59e0b); color:#0a1142;
+    text-align:center; padding:16mm; border-radius:13mm; }
+  .footband .d1{ font-size:40pt; font-weight:900; letter-spacing:3px; }
+  .footband .d2{ font-size:30pt; font-weight:800; margin-top:5mm; }
+  .contacts{ display:flex; justify-content:center; gap:22mm; flex-wrap:wrap; }
+  .contacts span{ background:#fff; color:#0a1142; border-radius:40mm;
+    padding:11mm 28mm; font-size:30pt; font-weight:900; }
+
+  @media print { .glow{ display:none !important; } *{ box-shadow:none !important; filter:none !important; }
+    .logobar{ border-width:4mm !important; } .pic{ border-width:6mm !important; } }
+</style>
+</head>
+<body>
+  <div class="standee">
+    <div class="glow a"></div><div class="glow b"></div>
+
+    <div class="logobar z">
+      <div class="lg"><img src="img/numl_logo_t.png" alt="NUML" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'NUML'}))"></div>
+      <div class="lg"><img src="img/rsi_t.png" style="transform:scale(0.84)" alt="R&SI" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'R&SI'}))"></div>
+      <div class="lg"><img src="img/placement_t.png" alt="Placement Center" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'Placement Center'}))"></div>
+      <div class="lg"><img src="img/fecs_t.png" alt="FE&CS" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'FE&CS'}))"></div>
+    </div>
+
+    <div class="event z">
+      <div class="e1">OPEN HOUSE &amp; JOB FAIR — SPRING 2026</div>
+      <div class="e2">FACULTY OF ENGINEERING &amp; COMPUTING</div>
+    </div>
+
+    <div class="collab z">
+      <div class="lbl">IN COLLABORATION WITH</div>
+      <div class="pill"><img src="img/alberuni_t.png" alt="" onerror="this.remove()"><b>ALBERUNI TECH</b></div>
+    </div>
+
+    <div class="title-block z">
+      <div class="title">Ad<span class="amber">Motion</span></div>
+      <div class="subtitle">AI-Powered Smart Vehicle Advertising Platform</div>
+    </div>
+
+    <div class="preview z">
+      <div class="shot">
+        <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+        <img src="img/dash.png" alt="Dashboard" onerror="this.parentNode.style.display='none'">
+        <div class="cap">Live Admin Dashboard</div>
+      </div>
+      <div class="shot">
+        <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+        <img src="img/sched.png" alt="Scheduling" onerror="this.parentNode.style.display='none'">
+        <div class="cap">AI Scheduling Engine</div>
+      </div>
+    </div>
+
+    <div class="desc z">
+      AdMotion turns the unused roof space on taxis &amp; commercial vehicles into <b>smart moving
+      digital billboards</b>. An <b>AI engine decides which ad runs on which vehicle, where and
+      when</b> — using GPS location, time of day &amp; live weather to maximise real-world reach.
+    </div>
+
+    <div class="z">
+      <div class="h"><span class="bar"></span><span class="amber">AI&nbsp;FEATURES</span></div>
+      <div class="ai-grid">
+        <div class="ai-card"><div class="ai-ic">🤖</div><div><div class="tt">AI Ad Scheduling &amp; Optimization</div><div class="dd">Picks the best ads per vehicle by GPS area, time-slot, weather &amp; fairness scoring.</div></div></div>
+        <div class="ai-card"><div class="ai-ic">📈</div><div><div class="tt">AI Reach-Estimation Engine</div><div class="dd">Estimates real-world impressions per play (area × time × weather).</div></div></div>
+        <div class="ai-card"><div class="ai-ic">🧠</div><div><div class="tt">ML Impression Prediction</div><div class="dd">scikit-learn model learns from collected data to predict reach &amp; demand.</div></div></div>
+        <div class="ai-card"><div class="ai-ic">🎯</div><div><div class="tt">Smart Geo &amp; Weather Targeting</div><div class="dd">Geo-fenced city/area detection auto-targets the right audience.</div></div></div>
+        <div class="ai-card"><div class="ai-ic">🎙️</div><div><div class="tt">AI Voice-Command Control</div><div class="dd">Hands-free dashboard control via real-time speech recognition.</div></div></div>
+        <div class="ai-card"><div class="ai-ic">⚙️</div><div><div class="tt">Self-Optimizing Budget Pacing</div><div class="dd">AI balances spend across the fleet so every campaign's budget is used efficiently.</div></div></div>
+      </div>
+    </div>
+
+    <div class="z">
+      <div class="h"><span class="bar"></span>KEY&nbsp;<span class="amber">FEATURES</span></div>
+      <ul class="feat">
+        <li>Real-Time GPS Fleet Tracking &amp; Live Map</li>
+        <li>Cloud-Controlled Vehicle LED Displays</li>
+        <li>Real-Time Analytics &amp; Reach Charts</li>
+        <li>Campaign &amp; Ad Management Dashboard</li>
+        <li>Driver Earnings &amp; Reporting Portal</li>
+        <li>Offline-Resilient Display &amp; Heartbeat</li>
+      </ul>
+    </div>
+
+    <div class="z">
+      <div class="h"><span class="bar"></span>HOW&nbsp;IT&nbsp;<span class="amber">WORKS</span></div>
+      <div class="flow">
+        <div class="step"><div class="num">1</div><div class="st">Create Campaign</div><div class="sp">Advertiser uploads ad, sets budget &amp; schedule</div></div>
+        <div class="step"><div class="num">2</div><div class="st">AI Assigns Ads</div><div class="sp">Engine scores ads by GPS, time &amp; weather</div></div>
+        <div class="step"><div class="num">3</div><div class="st">Vehicles Display</div><div class="sp">Roof LED screens play ads while driving</div></div>
+        <div class="step"><div class="num">4</div><div class="st">AI Estimates Reach</div><div class="sp">Real-world impressions per play</div></div>
+        <div class="step"><div class="num">5</div><div class="st">Live Analytics</div><div class="sp">Reach, spend &amp; trends + model training</div></div>
+      </div>
+    </div>
+
+    <div class="z">
+      <div class="h"><span class="bar"></span>TECH&nbsp;<span class="amber">STACK</span></div>
+      <div class="tools">
+        <div class="tool"><img src="https://cdn.simpleicons.org/react/61DAFB" onerror="this.remove()"><b>React</b></div>
+        <div class="tool"><img src="https://cdn.simpleicons.org/vite/646CFF" onerror="this.remove()"><b>Vite</b></div>
+        <div class="tool"><img src="https://cdn.simpleicons.org/tailwindcss/06B6D4" onerror="this.remove()"><b>Tailwind</b></div>
+        <div class="tool"><img src="https://cdn.simpleicons.org/fastapi/009688" onerror="this.remove()"><b>FastAPI</b></div>
+        <div class="tool"><img src="https://cdn.simpleicons.org/python/3776AB" onerror="this.remove()"><b>Python</b></div>
+        <div class="tool"><img src="https://cdn.simpleicons.org/firebase/DD2C00" onerror="this.remove()"><b>Firebase</b></div>
+        <div class="tool"><img src="https://cdn.simpleicons.org/scikitlearn/F7931E" onerror="this.remove()"><b>scikit-learn</b></div>
+      </div>
+    </div>
+
+    <div class="team z">
+      <div class="person">
+        <div class="pic"><img src="img/zohaib.jpeg" onerror="this.style.display='none';this.parentNode.innerHTML='&lt;div class=ph&gt;ZA&lt;/div&gt;'"></div>
+        <div class="nm">Dr. Zohaib Ahmed</div><div class="rl">Project Manager</div><div class="ro">Department of Software Engineering</div>
+      </div>
+      <div class="person">
+        <div class="pic"><img src="img/muneeb.jpg" onerror="this.style.display='none';this.parentNode.innerHTML='&lt;div class=ph&gt;MA&lt;/div&gt;'"></div>
+        <div class="nm">Muneeb Ali Anwar</div><div class="rl">FL21459 — Team Lead</div><div class="ro">Full-Stack &amp; AI Developer</div>
+      </div>
+      <div class="person">
+        <div class="pic"><img src="img/msukan.png" onerror="this.style.display='none';this.parentNode.innerHTML='&lt;div class=ph&gt;MM&lt;/div&gt;'"></div>
+        <div class="nm">Muskan Muneeb</div><div class="rl">FL21481 — Member</div><div class="ro">AI Engineer</div>
+      </div>
+    </div>
+
+    <div class="footband z">
+      <div class="d1">DEPARTMENT OF SOFTWARE ENGINEERING</div>
+      <div class="d2">National University of Modern Languages (NUML), H-9, Islamabad</div>
+    </div>
+
+    <div class="contacts z">
+      <span>✉ muneebanwar2005@gmail.com</span>
+      <span>✉ muskanafsar66@gmail.com</span>
+    </div>
+  </div>
+</body>
+</html>

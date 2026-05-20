@@ -1,0 +1,50 @@
+============================================================
+ FYP STANDEE + BROCHURE TEMPLATES — HOW TO USE
+============================================================
+
+FILES (share these with students):
+  TEMPLATE-standee.html    -> roll-up standee  (850 x 2000 mm)
+  TEMPLATE-brochure.html   -> single-page A4 brochure (297 x 210 mm landscape)
+  HOW-TO-USE.txt           -> this guide
+
+STEP 1 — IMAGES
+  Make a folder named  img  next to the HTML file. Put inside:
+    Logos (top strip):  logo1.png  logo2.png  logo3.png  logo4.png
+    People photos:      member1.jpg  supervisor.jpg  member2.jpg
+  - Any of jpg/png/jpeg works; just match these names
+    (or edit the src="..." in the HTML).
+  - If a file is missing, a text fallback shows automatically — it won't break.
+  - Use clear, reasonably high-resolution logos (small images look blurry
+    when printed large, especially on the standee).
+
+STEP 2 — EDIT TEXT
+  Open the .html in any code/text editor (VS Code, Notepad++...).
+  Replace every  [[ ... ]]  placeholder with your own text. That's it.
+  - The first part of the title is white, the part inside
+    <span class="amber">...</span> is gold — split your project name there.
+  - Tech logos load from simpleicons.org. To change one, replace the slug
+    in the URL, e.g.  .../react/...  ->  .../flutter/...
+    Find slugs at  https://simpleicons.org . Delete a <div class="tool">
+    line to remove a tech. If a logo doesn't exist it just shows the name.
+
+STEP 3 — EXPORT TO PDF
+  Open the .html in GOOGLE CHROME (keep internet ON so tech logos load).
+  Press  Ctrl + P  :
+     Destination     = Save as PDF
+     Layout          = (leave default; size comes from the file)
+     Margins         = None
+     Options         = tick "Background graphics"
+  Save.
+
+STEP 4 — SEND TO PRINTER
+  Standee :  "Roll-up standee, exact 850 x 2000 mm, print at 100% (no scaling)."
+  Brochure:  "A4 landscape, single page, print at 100%, 170-250 gsm card."
+
+RULES TO AVOID A BROKEN LAYOUT
+  - Keep text SHORT. Every block has a fixed height; too much text gets
+    clipped (it will NOT push other sections or overlap).
+  - Don't add extra sections to the brochure — replace, don't append.
+  - Keep the same number of items (logos, features, steps, team) where you
+    can; if you must remove one, delete the whole matching block.
+
+============================================================

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>NUML Job Fair — Invitation Standee</title>
+<style>
+  @page { size: 850mm 1130mm; margin: 0; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body{ font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif; }
+
+  .standee{
+    width:850mm; height:1130mm; position:relative; overflow:hidden; color:#fff;
+    background: linear-gradient(160deg,#3b0764 0%,#1e3a8a 40%,#0e7490 75%,#0a1142 100%);
+    padding:26mm 40mm; display:flex; flex-direction:column; justify-content:space-between; gap:8mm;
+  }
+  .deco{ position:absolute; border-radius:50%; opacity:.10; pointer-events:none; }
+  .deco.a{ width:540mm;height:540mm; background:#22d3ee; top:-240mm; right:-230mm; }
+  .deco.b{ width:480mm;height:480mm; background:#fb7185; bottom:-210mm; left:-210mm; }
+  .z{ position:relative; z-index:2; }
+
+  .logobar{ background:#fff; border-radius:12mm; border:4mm solid #22d3ee; height:108mm;
+    align-self:center; display:inline-flex; align-items:center; gap:28mm; padding:12mm 34mm; }
+  .lg{ display:flex; align-items:center; justify-content:center; height:100%; }
+  .lg img{ height:100%; width:auto; max-width:100%; object-fit:contain; display:block; }
+  .lg .cap{ font-size:30pt; font-weight:900; color:#0d1550; text-align:center; }
+
+  .fac{ text-align:center; font-size:40pt; font-weight:800; letter-spacing:5px; color:#67e8f9; }
+
+  .eyebrow{ text-align:center; font-size:38pt; font-weight:900; letter-spacing:10px; color:#fde047; }
+
+  .title{ text-align:center; }
+  .title .t1{ font-size:150pt; font-weight:900; line-height:.96; color:#fff; letter-spacing:1px; }
+  .title .t1 .g{ color:#fde047; }
+  .title .t2{ display:inline-block; margin-top:12mm; padding:10mm 46mm; border-radius:60mm;
+    font-size:56pt; font-weight:900; letter-spacing:8px; color:#0a1142;
+    background:linear-gradient(90deg,#fde047,#fb7185); }
+
+  .invite{ text-align:center; font-size:42pt; line-height:1.45; color:#eaf0ff; max-width:740mm;
+    margin:0 auto; font-weight:600; }
+  .invite b{ color:#fde047; }
+
+  .cards{ display:flex; flex-direction:column; gap:16mm; }
+  .card{ display:flex; align-items:center; gap:24mm; padding:24mm 32mm; border-radius:16mm; }
+  .card:nth-child(1){ background:linear-gradient(135deg,#2563eb,#22d3ee); }
+  .card:nth-child(2){ background:linear-gradient(135deg,#9333ea,#ec4899); }
+  .card:nth-child(3){ background:linear-gradient(135deg,#0891b2,#22c55e); }
+  .card .ic{ width:96mm;height:96mm;flex:none;border-radius:18mm;background:rgba(255,255,255,.28);
+    display:flex;align-items:center;justify-content:center;font-size:52pt; }
+  .card .lbl{ font-size:26pt;font-weight:800;letter-spacing:5px;color:#eaf4ff; }
+  .card .val{ font-size:46pt;font-weight:900;color:#fff;margin-top:4mm;line-height:1.12; }
+
+  .rsvp{ text-align:center; border:3mm solid #fde047; border-radius:14mm; padding:26mm 32mm;
+    background:rgba(253,224,71,.12); }
+  .rsvp .h{ font-size:32pt; font-weight:900; letter-spacing:6px; color:#fde047; }
+  .rsvp .b{ font-size:46pt; font-weight:900; color:#fff; margin-top:7mm; line-height:1.25; }
+  .rsvp .b u{ color:#fde047; text-decoration:none; }
+
+  .footband{ background:linear-gradient(90deg,#22d3ee,#a855f7,#fb7185); color:#fff;
+    text-align:center; padding:22mm; border-radius:13mm; }
+  .footband .d1{ font-size:44pt; font-weight:900; letter-spacing:3px; }
+  .footband .d2{ font-size:26pt; font-weight:800; margin-top:8mm; }
+
+  @media print { .deco{ opacity:.08 !important; } *{ box-shadow:none !important; }
+    .logobar{ border-width:4mm !important; } }
+</style>
+</head>
+<body>
+  <div class="standee">
+    <div class="deco a"></div><div class="deco b"></div>
+
+    <div class="logobar z">
+      <div class="lg"><img src="img/numl_logo_t.png" alt="NUML" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'NUML'}))"></div>
+      <div class="lg"><img src="img/rsi_t.png" style="transform:scale(0.84)" alt="R&SI" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'R&SI'}))"></div>
+      <div class="lg"><img src="img/placement_t.png" alt="NPC" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'NPC'}))"></div>
+      <div class="lg"><img src="img/fecs_t.png" alt="FE&CS" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cap',textContent:'FE&CS'}))"></div>
+    </div>
+
+    <div class="eyebrow z">YOU ARE CORDIALLY INVITED TO</div>
+
+    <div class="title z">
+      <div class="t1">NUML <span class="g">JOB&nbsp;FAIR</span></div>
+      <div class="t2">SPRING 2026</div>
+    </div>
+
+    <div class="invite z">
+      We <b>cordially invite you</b> to join the <b>NUML Job Fair</b> — meet &amp; hire our
+      brightest engineering, computing &amp; software talent, and build your future team.
+    </div>
+
+    <div class="cards z">
+      <div class="card">
+        <div class="ic">📅</div>
+        <div><div class="lbl">DAY &amp; DATE</div><div class="val">Thursday, 21 May 2026</div></div>
+      </div>
+      <div class="card">
+        <div class="ic">🕚</div>
+        <div><div class="lbl">TIME</div><div class="val">1145 hrs — 1630 hrs</div></div>
+      </div>
+      <div class="card">
+        <div class="ic">📍</div>
+        <div><div class="lbl">VENUE</div><div class="val">Ibn-e-Rushd Block — NUML, H-9</div></div>
+      </div>
+    </div>
+
+    <div class="rsvp z">
+      <div class="h">PLEASE CONFIRM YOUR PARTICIPATION &nbsp;·&nbsp; WhatsApp 0334-9676767</div>
+      <div class="b">Kindly confirm latest by <u>1200 hrs, 20 May 2026</u></div>
+    </div>
+
+    <div class="footband z">
+      <div class="d1">NUML PLACEMENT CENTRE</div>
+      <div class="d2">National University of Modern Languages (NUML), H-9, Islamabad</div>
+    </div>
+  </div>
+</body>
+</html>
