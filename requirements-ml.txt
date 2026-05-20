@@ -1,0 +1,7 @@
+# OPTIONAL — only needed to TRAIN the impression ML model locally.
+# These are lazy-imported; the backend runs fine without them (heuristic fallback).
+# Install locally with:  pip install -r requirements-ml.txt
+# Kept out of requirements.txt so cloud builds don't compile numpy from source.
+scikit-learn==1.5.2
+joblib==1.4.2
+numpy==2.1.3
