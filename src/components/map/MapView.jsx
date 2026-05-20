@@ -257,10 +257,26 @@ function MapStyleToggle({ current, onChange }) {
   )
 }
 
+// ─── Online status helper ────────────────────────────────────────────────────
+// A vehicle is ONLINE only if it is marked Active AND its last heartbeat is
+// recent. The display sends a heartbeat every 60s; if it dies/loses network
+// without cleanly setting Inactive, the stale "Active" status would otherwise
+// show it Online forever. We treat a heartbeat older than 3 min as offline.
+const ONLINE_WINDOW_MS = 180000 // 3 minutes
+
+function isVehicleOnline(vehicle) {
+  if (!vehicle || vehicle.status !== 'Active') return false
+  const ts = vehicle.lastSeen
+  if (!ts) return false
+  const date = ts?.toDate ? ts.toDate() : new Date(ts)
+  if (isNaN(date.getTime())) return false
+  return (Date.now() - date.getTime()) < ONLINE_WINDOW_MS
+}
+
 // ─── Vehicle Panel Card ──────────────────────────────────────────────────────
 
 function VehicleCard({ vehicle, currentAd, placeName, isSelected, onClick }) {
-  const isActive = vehicle.status === 'Active'
+  const isActive = isVehicleOnline(vehicle)
 
   return (
     <motion.button
@@ -330,6 +346,9 @@ const MapView = () => {
   const [mapStyle, setMapStyle] = useState('light')
   const [panelOpen, setPanelOpen] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all') // all | online | offline
+  const [page, setPage] = useState(0)
+  const [now, setNow] = useState(Date.now()) // ticks so stale heartbeats flip to offline live
   const [selectedVehicleId, setSelectedVehicleId] = useState(null)
   const [flyTo, setFlyTo] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -344,23 +363,53 @@ const MapView = () => {
 
   // ─── Computed ────────────────────────────────────────────────────────
 
-  const activeVehicles = vehicles.filter(v => v.status === 'Active').length
+  // re-evaluate online status every 30s (heartbeat staleness is time-based)
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(t)
+  }, [])
+
+  const activeVehicles = useMemo(() => vehicles.filter(isVehicleOnline).length, [vehicles, now])
   const totalVehicles = vehicles.length
   const vehiclesWithLocation = useMemo(
     () => vehicles.filter(v => v.currentLocation?.lat || v.location?.lat || v.lastLocation?.lat),
     [vehicles]
   )
 
+  // online / offline counts within the panel (vehicles with a location)
+  const panelOnline = useMemo(() => vehiclesWithLocation.filter(isVehicleOnline).length, [vehiclesWithLocation, now])
+  const panelOffline = vehiclesWithLocation.length - panelOnline
+
+  // search + status filter, then sort online-first / alphabetical
   const filteredVehicles = useMemo(() => {
-    if (!searchQuery.trim()) return vehiclesWithLocation
-    const q = searchQuery.toLowerCase()
-    return vehiclesWithLocation.filter(v =>
-      (v.vehicleName || '').toLowerCase().includes(q) ||
-      (v.carId || '').toLowerCase().includes(q) ||
-      (v.ownerName || '').toLowerCase().includes(q) ||
-      (placeNames[v.id] || '').toLowerCase().includes(q)
-    )
-  }, [vehiclesWithLocation, searchQuery, placeNames])
+    let list = vehiclesWithLocation
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      list = list.filter(v =>
+        (v.vehicleName || '').toLowerCase().includes(q) ||
+        (v.carId || '').toLowerCase().includes(q) ||
+        (v.ownerName || '').toLowerCase().includes(q) ||
+        (placeNames[v.id] || '').toLowerCase().includes(q)
+      )
+    }
+    if (statusFilter === 'online') list = list.filter(isVehicleOnline)
+    else if (statusFilter === 'offline') list = list.filter(v => !isVehicleOnline(v))
+    return [...list].sort((a, b) => {
+      const oa = isVehicleOnline(a), ob = isVehicleOnline(b)
+      if (oa !== ob) return oa ? -1 : 1
+      return (a.vehicleName || a.carId || '').localeCompare(b.vehicleName || b.carId || '')
+    })
+  }, [vehiclesWithLocation, searchQuery, statusFilter, placeNames, now])
+
+  // pagination — keeps the panel clean with hundreds of vehicles
+  const PER_PAGE = 8
+  const pageCount = Math.max(1, Math.ceil(filteredVehicles.length / PER_PAGE))
+  const pagedVehicles = useMemo(
+    () => filteredVehicles.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE),
+    [filteredVehicles, page]
+  )
+  useEffect(() => { setPage(0) }, [searchQuery, statusFilter])
+  useEffect(() => { if (page > pageCount - 1) setPage(0) }, [pageCount, page])
 
   // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -590,13 +639,7 @@ const MapView = () => {
               const lon = vehicle.currentLocation?.lng || vehicle.currentLocation?.lon || vehicle.location?.lon || vehicle.lastLocation?.lon
               if (!lat || !lon) return null
 
-              const isActive = (() => {
-                if (vehicle.status !== 'Active') return false
-                const ts = vehicle.lastSeen
-                if (!ts) return false
-                const date = ts.toDate ? ts.toDate() : new Date(ts)
-                return (new Date() - date) / 1000 < 300
-              })()
+              const isActive = isVehicleOnline(vehicle)
               const adObj = getCurrentAd(vehicle)
               const adName = adObj?.title || 'No Ad Assigned'
               const placeName = placeNames[vehicle.id] || vehicle.location?.address || 'Fetching...'
@@ -776,8 +819,13 @@ const MapView = () => {
                       </div>
                       Vehicles
                     </h3>
-                    <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-                      {filteredVehicles.length} shown
+                    <span className="flex items-center gap-2 text-[11px] font-medium">
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{panelOnline} online
+                      </span>
+                      <span className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />{panelOffline} offline
+                      </span>
                     </span>
                   </div>
 
@@ -806,6 +854,27 @@ const MapView = () => {
                       </button>
                     )}
                   </div>
+
+                  {/* Status filter pills */}
+                  <div className="flex items-center gap-1.5 mt-2.5">
+                    {[
+                      { key: 'all', label: 'All', count: vehiclesWithLocation.length },
+                      { key: 'online', label: 'Online', count: panelOnline },
+                      { key: 'offline', label: 'Offline', count: panelOffline },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setStatusFilter(f.key)}
+                        className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all duration-200 ${
+                          statusFilter === f.key
+                            ? 'bg-violet-500 text-white shadow-sm shadow-violet-500/30'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {f.label} <span className="opacity-70">{f.count}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Vehicle list */}
@@ -814,7 +883,7 @@ const MapView = () => {
                   scrollbar-track-transparent">
                   <AnimatePresence>
                     {filteredVehicles.length > 0 ? (
-                      filteredVehicles.map(vehicle => (
+                      pagedVehicles.map(vehicle => (
                         <VehicleCard
                           key={vehicle.id}
                           vehicle={vehicle}
@@ -838,6 +907,29 @@ const MapView = () => {
                     )}
                   </AnimatePresence>
                 </div>
+
+                {/* Pagination */}
+                {pageCount > 1 && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <button
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, filteredVehicles.length)} of {filteredVehicles.length}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+                      disabled={page >= pageCount - 1}
+                      className="px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
 
                 {/* Panel footer summary */}
                 <div className="p-3 border-t border-slate-200/60 dark:border-slate-700/60
