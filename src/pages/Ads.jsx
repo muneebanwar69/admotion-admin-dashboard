@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers, LayoutGrid, List, CheckCircle, DollarSign, Film, Type, Tag, Building2, Calendar, Activity, MapPin, Image as ImageIcon, Mail, Phone, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Pencil, Trash2, Save, PlusCircle, Upload, X, Search, Layers, LayoutGrid, List, CheckCircle, DollarSign, Film, Type, Tag, Building2, Calendar, Activity, MapPin, Image as ImageIcon, Mail, Phone, ChevronLeft, ChevronRight, Check, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import RealTimeIndicator from "../components/ui/RealTimeIndicator";
 import { db } from "../firebase";
 import {
@@ -40,6 +41,7 @@ const Ads = () => {
   const toast = useToast();
   const { currentUser } = useAuth();
   const { startUpload, isUploading } = useUpload();
+  const navigate = useNavigate();
   const [ads, setAds] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -347,6 +349,14 @@ const Ads = () => {
             </div>
             <div className="flex items-center gap-4">
               <RealTimeIndicator isActive={!loading} />
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/ai-generator')}
+                className="flex items-center gap-2 bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-400 hover:to-purple-500 text-white px-4 py-2 rounded-xl font-semibold border border-white/20 shadow-lg shadow-fuchsia-500/20 transition-all duration-300"
+              >
+                <Sparkles size={18} /> Generate with AI
+              </motion.button>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

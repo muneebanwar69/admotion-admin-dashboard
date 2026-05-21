@@ -8,6 +8,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import os
 import json
+import base64
 import logging
 import httpx
 from dotenv import load_dotenv
@@ -26,7 +27,7 @@ logger = logging.getLogger("admotion-scheduler")
 # ---------------------------------------------------------------------------
 # Load environment variables
 # ---------------------------------------------------------------------------
-load_dotenv()
+load_dotenv(override=True)
 
 # ---------------------------------------------------------------------------
 # Initialize Firestore (kept exactly as original)
@@ -50,8 +51,11 @@ try:
     db = firestore.client()
     logger.info("Firebase Admin initialized successfully")
 except Exception as e:
-    logger.error("Firebase initialization error: %s", e)
-    raise
+    # Non-fatal: the AI and weather endpoints don't need Firestore (the frontend
+    # writes ads to Firestore via the browser SDK). Boot anyway so those work;
+    # any endpoint that uses `db` will surface a clear error at request time.
+    logger.warning("Firebase initialization skipped (running without Firestore): %s", e)
+    db = None
 
 # ---------------------------------------------------------------------------
 # FastAPI App
@@ -98,9 +102,19 @@ class SchedulerStatusResponse(BaseModel):
 
 OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
 
+# OpenAI — AI ad/image generation
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_TEXT_MODEL: str = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini")
+OPENAI_IMAGE_MODEL: str = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1")
+
 COST_PER_IMPRESSION: float = 10.0  # PKR
 
 ADS_PER_VEHICLE: int = 5
+
+# Each assigned ad is shown for at least this many minutes before rotating.
+DISPLAY_MINUTES_PER_AD: int = 5
+# Approx seconds of a single ad play, used to estimate plays per display window.
+AVG_AD_SECONDS: int = 10
 
 # Time slot definitions (hour ranges, 24-h format)
 TIME_SLOTS: dict[str, tuple[int, int]] = {
@@ -479,6 +493,13 @@ async def run_ai_scheduler() -> dict:
     4. Assign ads to vehicle with time windows
     5. Persist assignments to Firestore
     """
+    if db is None:
+        msg = ("Firestore is not configured on the backend. Add a Firebase Admin "
+               "service account key (serviceAccountKey.json in the project root, "
+               "or set FIREBASE_SERVICE_ACCOUNT_JSON) and restart the server.")
+        logger.error(msg)
+        return {"ok": False, "error": msg}
+
     now = _utcnow()
     current_slot = get_current_time_slot(now)
     errors: list[str] = []
@@ -597,23 +618,47 @@ async def run_ai_scheduler() -> dict:
             scored.sort(key=lambda x: x[0], reverse=True)
             top_ads = [ad for _, ad in scored[:ADS_PER_VEHICLE]]
 
-            # 6e. Build assignment entries with time windows
+            # 6e. Build assignment entries with time windows.
+            # Each ad shows for DISPLAY_MINUTES_PER_AD (>=5 min) and we estimate
+            # its real-world impressions + ad cost with the AI impression model.
             assigned_list: list[dict] = []
-            slot_duration = timedelta(minutes=30)
+            slot_duration = timedelta(minutes=DISPLAY_MINUTES_PER_AD)
             for idx, ad in enumerate(top_ads):
                 start_time = now + slot_duration * idx
                 end_time = start_time + slot_duration
+                display_minutes = DISPLAY_MINUTES_PER_AD
+
+                # AI impression + cost estimate for this display window
+                est_plays = max(1, int(display_minutes * 60 / AVG_AD_SECONDS))
+                estimate = impression_model.predict(
+                    ad_plays=est_plays,
+                    area_name=vehicle_area,
+                    has_gps=bool(lat and lon),
+                    weather_category=weather_category,
+                    now=now,
+                )
+                est_impressions = int(round(estimate.get("estimatedReach", est_plays)))
+                est_cost = round(est_impressions * COST_PER_IMPRESSION, 2)
+                est_method = estimate.get("method", "heuristic")
+
                 entry = {
                     "adId": ad["id"],
                     "title": ad.get("title", ""),
+                    "preview": ad.get("preview") or ad.get("mediaUrl") or "",
+                    "company": ad.get("company", ""),
+                    "category": ad.get("category", ""),
                     "startTime": start_time.isoformat(),
                     "endTime": end_time.isoformat(),
+                    "displayMinutes": display_minutes,
                     "assignedBy": "ai",
                     "score": scored[idx][0] if idx < len(scored) else 0,
                     "city": vehicle_city or "",
                     "area": vehicle_area or "",
                     "timeSlot": current_slot,
                     "weather": weather_category,
+                    "estimatedImpressions": est_impressions,
+                    "estimatedCost": est_cost,
+                    "estimationMethod": est_method,
                 }
                 assigned_list.append(entry)
 
@@ -624,14 +669,21 @@ async def run_ai_scheduler() -> dict:
                         "vehicleId": vid,
                         "adId": ad["id"],
                         "adTitle": ad.get("title", ""),
+                        "preview": ad.get("preview") or ad.get("mediaUrl") or "",
+                        "company": ad.get("company", ""),
+                        "category": ad.get("category", ""),
                         "startTime": start_time.isoformat(),
                         "endTime": end_time.isoformat(),
+                        "displayMinutes": display_minutes,
                         "assignedBy": "ai",
                         "city": vehicle_city or "",
                         "area": vehicle_area or "",
                         "timeSlot": current_slot,
                         "weather": weather_category,
                         "score": scored[idx][0] if idx < len(scored) else 0,
+                        "estimatedImpressions": est_impressions,
+                        "estimatedCost": est_cost,
+                        "estimationMethod": est_method,
                         "createdAt": firestore.SERVER_TIMESTAMP,
                     })
                     batch_count += 1
@@ -840,6 +892,125 @@ async def train_model():
         return JSONResponse(status_code=status, content=result)
     except Exception as exc:
         logger.error("Model training failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# AI Ad Generator (OpenAI) — refine an idea + generate an ad image
+# ---------------------------------------------------------------------------
+
+class RefineRequest(BaseModel):
+    idea: str
+    product: Optional[str] = ""
+    tone: Optional[str] = "modern, bold, eye-catching"
+
+class GenerateRequest(BaseModel):
+    prompt: str
+    size: str = "1024x1024"               # 1024x1024 | 1024x1536 | 1536x1024
+    reference_image: Optional[str] = None  # base64 data URL (optional product image)
+
+
+def _require_openai():
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured on the server.")
+
+
+@app.get("/api/ai/status")
+async def ai_status():
+    """Report whether the AI generator is configured."""
+    return {
+        "ok": True,
+        "configured": bool(OPENAI_API_KEY),
+        "imageModel": OPENAI_IMAGE_MODEL,
+        "textModel": OPENAI_TEXT_MODEL,
+    }
+
+
+@app.post("/api/ai/refine")
+async def ai_refine(payload: RefineRequest):
+    """Turn a rough ad idea into a polished image prompt + headline + caption."""
+    _require_openai()
+    system = (
+        "You are an expert advertising creative director. Turn a rough ad idea into a vivid, detailed "
+        "image-generation prompt for an eye-catching billboard / vehicle-display advertisement, plus a "
+        "short punchy headline and a one-line caption. Respond ONLY as compact JSON with keys "
+        '"prompt", "headline", "caption".'
+    )
+    user = f"Product / brand: {payload.product or 'N/A'}\nDesired tone: {payload.tone}\nRough idea: {payload.idea}"
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            r = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                json={
+                    "model": OPENAI_TEXT_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "temperature": 0.8,
+                    "response_format": {"type": "json_object"},
+                },
+            )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"OpenAI error: {r.text[:300]}")
+        content = r.json()["choices"][0]["message"]["content"]
+        data = json.loads(content)
+        return {"ok": True, "prompt": data.get("prompt", payload.idea),
+                "headline": data.get("headline", ""), "caption": data.get("caption", "")}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("AI refine failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/ai/generate")
+async def ai_generate(payload: GenerateRequest):
+    """Generate an ad image from a prompt (optionally guided by a reference image)."""
+    _require_openai()
+    size = payload.size if payload.size in ("1024x1024", "1024x1536", "1536x1024") else "1024x1024"
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            if payload.reference_image:
+                # Derive the real MIME type from the data URL prefix so we don't
+                # mislabel JPEG/WEBP bytes as PNG (which OpenAI rejects as
+                # "invalid image file"). The frontend compresses uploads to JPEG.
+                header, _, raw = payload.reference_image.partition(",")
+                if not raw:  # no "data:...;base64," prefix
+                    raw = header
+                    header = "data:image/png;base64"
+                mime = "image/png"
+                if header.startswith("data:") and ";" in header:
+                    mime = header[5:].split(";", 1)[0] or "image/png"
+                ext = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/webp": "webp"}.get(mime, "png")
+                img_bytes = base64.b64decode(raw)
+                files = {"image": (f"reference.{ext}", img_bytes, mime)}
+                form = {"model": OPENAI_IMAGE_MODEL, "prompt": payload.prompt, "size": size, "n": "1"}
+                r = await client.post(
+                    "https://api.openai.com/v1/images/edits",
+                    headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                    data=form, files=files,
+                )
+            else:
+                r = await client.post(
+                    "https://api.openai.com/v1/images/generations",
+                    headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                    json={"model": OPENAI_IMAGE_MODEL, "prompt": payload.prompt, "size": size, "n": 1},
+                )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"OpenAI error: {r.text[:400]}")
+        item = r.json()["data"][0]
+        b64 = item.get("b64_json")
+        if b64:
+            return {"ok": True, "image": f"data:image/png;base64,{b64}"}
+        if item.get("url"):
+            return {"ok": True, "image": item["url"], "isUrl": True}
+        raise HTTPException(status_code=502, detail="OpenAI returned no image.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("AI generate failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

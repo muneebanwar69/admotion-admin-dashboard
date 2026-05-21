@@ -244,9 +244,11 @@ const DriverDashboard = () => {
       if (snap.exists()) {
         const data = { id: snap.id, ...snap.data() }
         setVehicle(data)
+        // Online = actively heartbeating recently. Matches the admin fleet map's
+        // 3-min window (heartbeat is 60s, so this tolerates a couple missed beats).
         const lastSeen = data.lastSeen?.toDate?.()
-        const isFresh = lastSeen && (Date.now() - lastSeen.getTime()) < 2 * 60 * 1000
-        setVehicleOnline(data.status === 'Active' && isFresh !== false)
+        const isFresh = !!lastSeen && (Date.now() - lastSeen.getTime()) < 3 * 60 * 1000
+        setVehicleOnline(data.status === 'Active' && isFresh)
       }
       setLoading(false)
     })

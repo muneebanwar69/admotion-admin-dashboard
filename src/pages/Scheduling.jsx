@@ -10,7 +10,8 @@ import { collection, onSnapshot, updateDoc, doc, serverTimestamp, deleteField } 
 import { useToast } from "../contexts/ToastContext";
 import {
   Calendar, Cpu, CloudSun, Truck, Layers, Zap, Clock, RefreshCw, AlertCircle,
-  Sun, CloudRain, CloudSnow, Cloud, Play, Settings, Trash2, CheckCircle
+  Sun, CloudRain, CloudSnow, Cloud, Play, Settings, Trash2, CheckCircle,
+  Timer, MapPin, Target, ListChecks, ArrowRight, Eye, DollarSign, Image as ImageIcon
 } from "lucide-react";
 
 // Weather icon mapper
@@ -67,6 +68,7 @@ export default function SchedulingPage() {
   const [selectedTestAd, setSelectedTestAd] = useState('');
   const [testPushing, setTestPushing] = useState(false);
   const [testClearing, setTestClearing] = useState(false);
+  const [assignments, setAssignments] = useState([]);
   const toast = useToast();
 
   const cities = ['Islamabad', 'Lahore', 'Karachi', 'Rawalpindi'];
@@ -104,6 +106,21 @@ export default function SchedulingPage() {
       setAds(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => { unsubVehicles(); unsubAds(); };
+  }, []);
+
+  // Live AI schedule — assignments written by the scheduler (newest first)
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'assignments'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const ms = (r) => {
+        const t = r.createdAt?.toMillis ? r.createdAt.toMillis()
+          : (r.startTime ? Date.parse(r.startTime) : 0);
+        return t || 0;
+      };
+      rows.sort((a, b) => ms(b) - ms(a));
+      setAssignments(rows.slice(0, 50));
+    });
+    return () => unsub();
   }, []);
 
   const handleRunAi = async () => {
@@ -172,6 +189,56 @@ export default function SchedulingPage() {
     { label: 'Unscheduled', value: unscheduledVehicles > 0 ? unscheduledVehicles : 0, color: '#f59e0b' },
     { label: 'Inactive', value: vehicles.length - activeVehicles, color: '#94a3b8' },
   ];
+
+  // ---- Live AI schedule table helpers ----
+  const vehicleNameById = React.useMemo(() => {
+    const m = {};
+    vehicles.forEach(v => { m[v.id] = v.vehicleName || v.name || v.plate || v.id; });
+    return m;
+  }, [vehicles]);
+
+  // ad image + meta lookup (fallback for assignments saved before images were stored)
+  const adById = React.useMemo(() => {
+    const m = {};
+    ads.forEach(a => { m[a.id] = a; });
+    return m;
+  }, [ads]);
+  const adImage = (a) => a.preview || adById[a.adId]?.preview || adById[a.adId]?.mediaUrl || '';
+  const adCategory = (a) => a.category || adById[a.adId]?.category || '';
+  const fmtPKR = (n) => `Rs ${Math.round(n || 0).toLocaleString()}`;
+
+  // total estimated spend/impressions across the live schedule
+  const scheduleTotals = React.useMemo(() => assignments.reduce((acc, a) => {
+    acc.impressions += a.estimatedImpressions || 0;
+    acc.cost += a.estimatedCost || 0;
+    return acc;
+  }, { impressions: 0, cost: 0 }), [assignments]);
+
+  const fmtTime = (iso) => {
+    if (!iso) return '--';
+    const d = new Date(iso);
+    return isNaN(d) ? '--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  const durationMins = (a) => {
+    if (!a.startTime || !a.endTime) return null;
+    const mins = Math.round((Date.parse(a.endTime) - Date.parse(a.startTime)) / 60000);
+    return Number.isFinite(mins) && mins > 0 ? mins : null;
+  };
+  const fmtWhen = (a) => {
+    const t = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.startTime ? Date.parse(a.startTime) : null);
+    if (!t) return '--';
+    const diff = Date.now() - t;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return new Date(t).toLocaleString();
+  };
+  const slotColor = (slot) => ({
+    morning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    afternoon: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    evening: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    night: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+  }[(slot || '').toLowerCase()] || 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300');
 
   return (
     <motion.div
@@ -500,6 +567,155 @@ export default function SchedulingPage() {
               </motion.button>
             </div>
           </motion.div>
+        </motion.div>
+
+        {/* Live AI Schedule — assignments produced by the scheduler */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 mb-6 overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 opacity-80" />
+          <div className="flex items-center justify-between gap-3 p-5 border-b border-slate-100 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <ListChecks className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Live AI Schedule</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Which ad plays on which vehicle, for how long, with AI-estimated reach &amp; cost</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {assignments.length > 0 && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-semibold" title="Total AI-estimated impressions across the schedule">
+                    <Eye className="w-3.5 h-3.5" />{Math.round(scheduleTotals.impressions).toLocaleString()} est. reach
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs font-semibold" title="Total AI-estimated ad spend across the schedule">
+                    <DollarSign className="w-3.5 h-3.5" />{fmtPKR(scheduleTotals.cost)}
+                  </span>
+                </>
+              )}
+              <RealTimeIndicator isActive={true} />
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{assignments.length} assignment{assignments.length === 1 ? '' : 's'}</span>
+            </div>
+          </div>
+
+          {assignments.length === 0 ? (
+            <div className="p-10 text-center">
+              <Cpu className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-500 dark:text-slate-400 font-medium">No schedule yet</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Click <span className="font-semibold">Run AI Scheduler Now</span> above to generate assignments.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/40">
+                    <th className="px-5 py-3 font-semibold">Vehicle</th>
+                    <th className="px-5 py-3 font-semibold">Ad</th>
+                    <th className="px-5 py-3 font-semibold">Display</th>
+                    <th className="px-5 py-3 font-semibold">Time Window</th>
+                    <th className="px-5 py-3 font-semibold">AI Reach</th>
+                    <th className="px-5 py-3 font-semibold">Est. Cost</th>
+                    <th className="px-5 py-3 font-semibold">Basis</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {assignments.map((a) => {
+                    const mins = a.displayMinutes || durationMins(a);
+                    const img = adImage(a);
+                    const cat = adCategory(a);
+                    return (
+                      <motion.tr
+                        key={a.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
+                      >
+                        {/* Vehicle */}
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                            <div>
+                              <div className="font-semibold text-slate-800 dark:text-slate-100">{vehicleNameById[a.vehicleId] || a.vehicleId || '—'}</div>
+                              {(a.city || a.area) && (
+                                <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                                  <MapPin className="w-3 h-3" />{[a.city, a.area].filter(Boolean).join(' · ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        {/* Ad — real image thumbnail + title + category */}
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            {img ? (
+                              <img src={img} alt={a.adTitle || a.title || 'ad'} loading="lazy"
+                                className="w-12 h-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700 flex-shrink-0" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
+                                <ImageIcon className="w-5 h-5 text-slate-400" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[180px]">{a.adTitle || a.title || a.adId}</div>
+                              {cat && <div className="text-xs text-slate-400">{cat}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        {/* Display minutes (>= 5 min per image) */}
+                        <td className="px-5 py-3">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-semibold whitespace-nowrap">
+                            <Timer className="w-3.5 h-3.5" />{mins != null ? `${mins} min` : '—'}
+                          </span>
+                        </td>
+                        {/* Time window */}
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            {fmtTime(a.startTime)} <ArrowRight className="w-3 h-3 text-slate-400" /> {fmtTime(a.endTime)}
+                          </span>
+                        </td>
+                        {/* AI estimated impressions */}
+                        <td className="px-5 py-3">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-semibold whitespace-nowrap"
+                            title={`AI-estimated people reached${a.estimationMethod ? ' (' + a.estimationMethod + ')' : ''}`}>
+                            <Eye className="w-3.5 h-3.5" />{a.estimatedImpressions != null ? Math.round(a.estimatedImpressions).toLocaleString() : '—'}
+                          </span>
+                        </td>
+                        {/* Estimated cost */}
+                        <td className="px-5 py-3 whitespace-nowrap font-semibold text-slate-700 dark:text-slate-200">
+                          {a.estimatedCost != null ? fmtPKR(a.estimatedCost) : '—'}
+                        </td>
+                        {/* Basis */}
+                        <td className="px-5 py-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {a.timeSlot && (
+                              <span className={`px-2 py-0.5 rounded-md text-xs font-medium capitalize ${slotColor(a.timeSlot)}`}>{a.timeSlot}</span>
+                            )}
+                            {a.weather && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                                <WeatherIcon condition={a.weather} className="w-3 h-3" />{a.weather}
+                              </span>
+                            )}
+                            {a.score != null && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-400" title="Match score from the AI ranking">
+                                <Target className="w-3 h-3" />{typeof a.score === 'number' ? a.score.toFixed(1) : a.score}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </motion.div>
 
         {/* Campaign Content Grid */}

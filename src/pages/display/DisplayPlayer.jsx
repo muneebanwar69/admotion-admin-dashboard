@@ -191,37 +191,44 @@ const DisplayPlayer = () => {
     load()
   }, [openIDB])
 
-  // Set Inactive when display closes / tab closes / navigates away
+  // Online/offline lifecycle.
+  // IMPORTANT: online status is driven by heartbeat freshness (lastSeen), NOT by
+  // tab visibility. Backgrounding/switching tabs must NOT mark the screen offline,
+  // otherwise the admin map & driver app flap between online/offline. We only set
+  // 'Inactive' on a real close (tab/window unload or navigating away from the player).
   useEffect(() => {
     if (!vehicleDocId) return
+
+    // Instant "I'm on" signal so the admin dashboard sees it online immediately,
+    // without waiting for the first full heartbeat (which does a getDoc round-trip).
+    updateDoc(doc(db, 'vehicles', vehicleDocId), {
+      status: 'Active',
+      lastSeen: serverTimestamp(),
+      'displayDevice.lastConnect': new Date().toISOString(),
+    }).catch(() => {})
+
     const setInactive = () => {
-      // Use sendBeacon for reliability on page unload
-      const payload = JSON.stringify({
-        status: 'Inactive',
-        'displayDevice.lastDisconnect': new Date().toISOString(),
-      })
-      // Fallback: try updateDoc (may not complete on unload)
       updateDoc(doc(db, 'vehicles', vehicleDocId), {
         status: 'Inactive',
         'displayDevice.lastDisconnect': new Date().toISOString(),
       }).catch(() => {})
     }
-    window.addEventListener('beforeunload', setInactive)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && vehicleDocId) {
-        updateDoc(doc(db, 'vehicles', vehicleDocId), {
-          status: 'Inactive',
-        }).catch(() => {})
-      } else if (document.visibilityState === 'visible' && vehicleDocId) {
+    // When the tab becomes visible again, immediately refresh the heartbeat so
+    // there's no offline gap after returning to the screen.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
         updateDoc(doc(db, 'vehicles', vehicleDocId), {
           status: 'Active',
           lastSeen: serverTimestamp(),
         }).catch(() => {})
       }
-    })
+    }
+    window.addEventListener('beforeunload', setInactive)
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
       window.removeEventListener('beforeunload', setInactive)
-      // Also set inactive on React cleanup (navigation away)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      // Real navigation away from the player → screen stopped.
       setInactive()
     }
   }, [vehicleDocId])

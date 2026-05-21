@@ -38,7 +38,17 @@ export async function getWeather(city) {
   try {
     const res = await fetch(`${API_URL}/api/weather/${encodeURIComponent(city)}`);
     if (!res.ok) throw new Error(`Weather fetch failed: ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    const w = data?.weather || {};
+    if (w.temp === undefined && w.temp === null) return null;
+    // Normalize backend shape ({weather:{temp,category,main,description}}) to a
+    // flat shape the UI consumes ({temp, condition, description}).
+    return {
+      temp: typeof w.temp === 'number' ? Math.round(w.temp) : (w.temp ?? null),
+      condition: w.category || w.main || 'N/A',
+      description: w.description || '',
+      main: w.main || '',
+    };
   } catch (err) {
     return null;
   }

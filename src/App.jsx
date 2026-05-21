@@ -24,6 +24,8 @@ import useOfflineSupport from './hooks/useOfflineSupport'
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Ads = lazy(() => import('./pages/Ads'))
+const AIAdGenerator = lazy(() => import('./pages/AIAdGenerator'))
+const DriverTracking = lazy(() => import('./pages/DriverTracking'))
 const Vehicles = lazy(() => import('./pages/Vehicles'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const Scheduling = lazy(() => import('./pages/Scheduling'))
@@ -203,6 +205,20 @@ function AdminAppRoutes() {
                 <ProtectedRoute>
                   <PageTransition>
                     <Ads />
+                  </PageTransition>
+                </ProtectedRoute>
+              } />
+              <Route path='/ai-generator' element={
+                <ProtectedRoute>
+                  <PageTransition>
+                    <AIAdGenerator />
+                  </PageTransition>
+                </ProtectedRoute>
+              } />
+              <Route path='/driver-tracking' element={
+                <ProtectedRoute>
+                  <PageTransition>
+                    <DriverTracking />
                   </PageTransition>
                 </ProtectedRoute>
               } />

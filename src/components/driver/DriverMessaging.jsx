@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MessageCircle, Send, X, ChevronLeft, User, Megaphone, CheckCheck, Check, Sparkles, Radio } from 'lucide-react'
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, where, limit, updateDoc, doc } from 'firebase/firestore'
+import { MessageCircle, Send, X, ChevronLeft, User, Megaphone, CheckCheck, Check, Sparkles, Radio, Plus, Headset } from 'lucide-react'
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, where, limit, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useDriverAuth } from '../../contexts/DriverAuthContext'
 import DOMPurify from 'dompurify'
@@ -38,9 +38,63 @@ const DriverMessaging = () => {
   const [messageText, setMessageText] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
   const [broadcastUnread, setBroadcastUnread] = useState(0)
+  const [admins, setAdmins] = useState([])
+  const [showNewChat, setShowNewChat] = useState(false)
+  const [starting, setStarting] = useState(false)
   const messagesEndRef = useRef(null)
 
   const driverId = driver?.uid // vehicle doc ID
+
+  // Start (or reopen) a conversation with an admin — lets the driver reach out first.
+  const startConversationWithAdmin = async (admin) => {
+    if (!driverId || starting) return
+    setStarting(true)
+    try {
+      const existing = conversations.find(c => c.participants?.includes(admin.id))
+      if (existing) {
+        setActiveConvo(existing); setShowNewChat(false); setStarting(false)
+        return
+      }
+      const adminName = admin.name || admin.username || 'Admin'
+      const driverName = driver?.name || 'Driver'
+      const docRef = await addDoc(collection(db, 'conversations'), {
+        participants: [admin.id, driverId],
+        participantNames: { [admin.id]: adminName, [driverId]: driverName },
+        participantType: 'driver',
+        lastMessage: null,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        unreadCount: { [admin.id]: 0, [driverId]: 0 },
+      })
+      setActiveConvo({ id: docRef.id, participants: [admin.id, driverId], participantNames: { [admin.id]: adminName, [driverId]: driverName }, unreadCount: {} })
+      setShowNewChat(false)
+    } catch (err) {
+      console.error('Failed to start conversation:', err)
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  // Open the "message admin" flow: load admins, then start directly if there's
+  // only one (the common case), otherwise show a picker.
+  const handleMessageAdmin = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'admins'))
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setAdmins(list)
+      if (list.length === 1) {
+        startConversationWithAdmin(list[0])
+      } else if (list.length === 0) {
+        // No admin records — fall back to a well-known support conversation id
+        startConversationWithAdmin({ id: 'admin', name: 'Support' })
+      } else {
+        setShowNewChat(true)
+      }
+    } catch (err) {
+      console.error('Failed to load admins:', err)
+      startConversationWithAdmin({ id: 'admin', name: 'Support' })
+    }
+  }
 
   // Load conversations where this driver is a participant
   useEffect(() => {
@@ -230,14 +284,27 @@ const DriverMessaging = () => {
                   )}
                 </div>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsOpen(false)}
-                className="relative p-2 sm:p-1.5 rounded-xl hover:bg-white/15 transition-colors text-white"
-              >
-                <X className="w-5 h-5 sm:w-4 sm:h-4" />
-              </motion.button>
+              <div className="relative flex items-center gap-1">
+                {!activeConvo && activeTab === 'messages' && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleMessageAdmin}
+                    title="Message Admin"
+                    className="p-2 sm:p-1.5 rounded-xl hover:bg-white/15 transition-colors text-white"
+                  >
+                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
+                  </motion.button>
+                )}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 sm:p-1.5 rounded-xl hover:bg-white/15 transition-colors text-white"
+                >
+                  <X className="w-5 h-5 sm:w-4 sm:h-4" />
+                </motion.button>
+              </div>
             </div>
 
             {/* Tabs (when no active convo) */}
@@ -333,7 +400,16 @@ const DriverMessaging = () => {
                         </motion.div>
                       </motion.div>
                       <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No messages yet</p>
-                      <p className="text-xs text-slate-400 mt-1 text-center">Admin will contact you here</p>
+                      <p className="text-xs text-slate-400 mt-1 text-center mb-4">Reach out to the admin anytime</p>
+                      <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={handleMessageAdmin}
+                        disabled={starting}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold shadow-lg shadow-blue-500/25 disabled:opacity-60"
+                      >
+                        <Headset className="w-4 h-4" /> {starting ? 'Connecting…' : 'Message Admin'}
+                      </motion.button>
                     </div>
                   ) : (
                     <div className="py-1">
@@ -582,6 +658,41 @@ const DriverMessaging = () => {
                         <Send className="w-5 h-5 sm:w-4 sm:h-4" />
                       </motion.button>
                     </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Admin picker (only when multiple admins exist) */}
+            <AnimatePresence>
+              {showNewChat && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl flex flex-col"
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                    <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">Choose an admin</span>
+                    <button onClick={() => setShowNewChat(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto py-1">
+                    {admins.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => startConversationWithAdmin(a)}
+                        disabled={starting}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50/70 dark:hover:bg-blue-900/15 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{a.name || a.username || 'Admin'}</p>
+                          {a.email && <p className="text-xs text-slate-400 truncate">{a.email}</p>}
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </motion.div>
               )}

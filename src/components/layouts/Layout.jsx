@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, LogOut, BarChart3, Bell, User, Truck, LayoutDashboard, Layers, Sun, Moon, Shield, CalendarClock, ChevronRight, PanelLeftClose, PanelLeft, FileText, Settings } from 'lucide-react'
+import { Menu, LogOut, BarChart3, Bell, User, Truck, LayoutDashboard, Layers, Sun, Moon, Shield, CalendarClock, ChevronRight, PanelLeftClose, PanelLeft, FileText, Settings, Sparkles, TrendingUp } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import VoiceCommand from '../VoiceCommand'
@@ -15,7 +15,9 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { to: '/vehicles', label: 'Vehicles Management', icon: <Truck size={20} /> },
   { to: '/ads', label: 'Ads Management', icon: <Layers size={20} /> },
+  { to: '/ai-generator', label: 'AI Ad Generator', icon: <Sparkles size={20} /> },
   { to: '/scheduling', label: 'Scheduling', icon: <CalendarClock size={20} /> },
+  { to: '/driver-tracking', label: 'Driver Tracking', icon: <TrendingUp size={20} /> },
   { to: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
   { to: '/alerts', label: 'Alerts Management', icon: <Bell size={20} /> },
   { to: '/my-profile', label: 'My Profile', icon: <User size={20} /> },
