@@ -62,17 +62,47 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 app = FastAPI(title="AdMotion Scheduler API", version="2.0.0")
 
-allowed_origins = os.getenv(
-    "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
-).split(",")
+# Default allowed origins: local dev + the deployed Vercel app (so the deployed
+# frontend can reach a locally-running backend during demos). Override with the
+# CORS_ORIGINS env var in production. Also allow any *.vercel.app via regex.
+_default_origins = ",".join([
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "https://fyp-iota-nine.vercel.app",
+])
+allowed_origins = os.getenv("CORS_ORIGINS", _default_origins).split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=[o.strip() for o in allowed_origins if o.strip()],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Chrome's Private Network Access: a public HTTPS page (the deployed Vercel app)
+# calling a local/loopback backend (127.0.0.1) triggers a preflight that requires
+# this header, or the request is blocked. Adding it lets the deployed frontend
+# talk to a locally-running backend during demos.
+@app.middleware("http")
+async def allow_private_network(request, call_next):
+    if request.method == "OPTIONS" and request.headers.get("access-control-request-private-network"):
+        from starlette.responses import Response
+        resp = Response(status_code=200)
+        origin = request.headers.get("origin", "*")
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Methods"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
+        resp.headers["Access-Control-Allow-Credentials"] = "true"
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"
+        return resp
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 
 # ---------------------------------------------------------------------------
 # Pydantic Models
