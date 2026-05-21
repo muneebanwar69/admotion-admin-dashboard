@@ -284,8 +284,14 @@ const Vehicles = () => {
         fileToBase64(step3.regDocFile),
       ]);
 
+      // Keep the displayed owner name in sync with the structured first/last name
+      // (Step 2). Otherwise editing the owner's first/last name wouldn't update the
+      // table, which reads `ownerName`.
+      const ownerFullName = `${(step2.firstName || '').trim()} ${(step2.lastName || '').trim()}`.trim()
+
       const record = {
-        carId, type: step1.type, vehicleName: step1.vehicleName, ownerName: step1.ownerName,
+        carId, type: step1.type, vehicleName: step1.vehicleName,
+        ownerName: ownerFullName || step1.ownerName,
         model: step1.model, color: step1.color, cnic: step1.cnic, duration: step1.duration,
         registrationDate: step1.registrationDate, password: step1.password,
         contractRate: parseInt(step1.contractRate) || 0, requiredHoursPerDay: parseInt(step1.requiredHoursPerDay) || 8,
