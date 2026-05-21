@@ -641,10 +641,16 @@ async def run_ai_scheduler() -> dict:
                 est_cost = round(est_impressions * COST_PER_IMPRESSION, 2)
                 est_method = estimate.get("method", "heuristic")
 
+                # Only store a lightweight URL preview in docs — never a base64
+                # data URL (those would bloat the vehicle doc past Firestore's 1MB
+                # limit). The frontend falls back to the ads collection for images.
+                ad_preview = ad.get("preview") or ad.get("mediaUrl") or ""
+                safe_preview = ad_preview if isinstance(ad_preview, str) and ad_preview.startswith("http") else ""
+
                 entry = {
                     "adId": ad["id"],
                     "title": ad.get("title", ""),
-                    "preview": ad.get("preview") or ad.get("mediaUrl") or "",
+                    "preview": safe_preview,
                     "company": ad.get("company", ""),
                     "category": ad.get("category", ""),
                     "startTime": start_time.isoformat(),
@@ -669,7 +675,7 @@ async def run_ai_scheduler() -> dict:
                         "vehicleId": vid,
                         "adId": ad["id"],
                         "adTitle": ad.get("title", ""),
-                        "preview": ad.get("preview") or ad.get("mediaUrl") or "",
+                        "preview": safe_preview,
                         "company": ad.get("company", ""),
                         "category": ad.get("category", ""),
                         "startTime": start_time.isoformat(),

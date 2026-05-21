@@ -6,7 +6,7 @@
 // File Upload Limits
 export const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 export const MAX_IMAGE_SIZE = 700 * 1024 // 700KB base64 = ~500KB file
-export const MAX_BASE64_SIZE = 700 * 1024 // 700KB base64 = ~500KB file (alias for MAX_IMAGE_SIZE)
+export const MAX_BASE64_SIZE = 850 * 1024 // 850KB stored base64 string — safely under Firestore's 1MB doc limit
 export const MAX_VIDEO_SIZE_MB = 100 // 100MB max for videos
 export const MAX_IMAGE_DIMENSION = 1200 // Max width/height for images
 

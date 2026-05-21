@@ -53,20 +53,29 @@ export const UploadProvider = ({ children }) => {
         canvas.height = height
         ctx.drawImage(img, 0, 0, width, height)
         
-        // Try different quality levels until under size limit
-        const tryCompress = (q) => {
+        // Try lower quality, then progressively smaller dimensions, until the
+        // ACTUAL stored string (dataUrl.length ≈ Firestore bytes) is under the cap.
+        // This guarantees we never exceed Firestore's 1MB document limit.
+        const tryCompress = (q, scaleStep = 0) => {
           const dataUrl = canvas.toDataURL('image/jpeg', q)
-          const base64Size = dataUrl.length * 0.75 // Approximate actual size
-          
-          if (base64Size <= maxSizeBytes || q <= 0.1) {
-            console.log(`✅ Compressed image: ${(base64Size / 1024).toFixed(0)}KB at quality ${q}`)
+          if (dataUrl.length <= maxSizeBytes) {
+            console.log(`✅ Compressed image: ${(dataUrl.length / 1024).toFixed(0)}KB (stored) at quality ${q.toFixed(1)}`)
             resolve(dataUrl)
+          } else if (q > 0.3) {
+            tryCompress(q - 0.1, scaleStep)
+          } else if (scaleStep < 4) {
+            // Still too big at low quality → shrink dimensions and retry.
+            canvas.width = Math.round(canvas.width * 0.8)
+            canvas.height = Math.round(canvas.height * 0.8)
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+            tryCompress(0.7, scaleStep + 1)
           } else {
-            // Try lower quality
-            tryCompress(q - 0.1)
+            // Last resort: return whatever we have (already heavily reduced).
+            console.warn(`⚠️ Image still ${(dataUrl.length / 1024).toFixed(0)}KB after max compression`)
+            resolve(dataUrl)
           }
         }
-        
+
         tryCompress(quality)
       }
       

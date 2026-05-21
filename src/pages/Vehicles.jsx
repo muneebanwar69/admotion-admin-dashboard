@@ -224,13 +224,46 @@ const Vehicles = () => {
   const back = () => setCurrentStep((s) => Math.max(1, s - 1));
 
   // Convert a File to base64 string
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      if (!file) { resolve(null); return; }
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+  // Read a file as a raw data URL (used as a fallback for non-image files).
+  const readAsDataUrl = (file) => new Promise((resolve, reject) => {
+    if (!file) { resolve(null); return; }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  // Convert a document file to base64, compressing images so the vehicle doc
+  // stays under Firestore's 1 MB limit (CNIC/registration photos can be several MB).
+  const fileToBase64 = async (file, maxBytes = 280 * 1024) => {
+    if (!file) return null;
+    // Non-image files (e.g. PDFs) can't be canvas-compressed — store as-is.
+    if (!file.type?.startsWith('image/')) return readAsDataUrl(file);
+
+    const dataUrl = await readAsDataUrl(file);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 1280;
+        const scale = Math.min(1, maxW / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        const ctx = c.getContext('2d');
+        // white background (flattens any transparency for JPEG)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        let q = 0.8;
+        let out = c.toDataURL('image/jpeg', q);
+        while (out.length > maxBytes && q > 0.35) {
+          q -= 0.1;
+          out = c.toDataURL('image/jpeg', q);
+        }
+        resolve(out);
+      };
+      img.onerror = () => resolve(dataUrl); // fall back to original on decode error
+      img.src = dataUrl;
     });
   };
 
