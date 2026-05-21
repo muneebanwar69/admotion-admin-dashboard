@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&family=Poppins:wght@500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1280px; height:720px; overflow:hidden; }
+  body {
+    font-family:'Noto Sans Bengali','Poppins',sans-serif;
+    background:radial-gradient(1200px 700px at 50% -10%, #1e1b4b 0%, #312e81 45%, #0b1020 100%);
+    color:#fff; display:flex; align-items:center; justify-content:center; position:relative;
+  }
+  .glow { position:absolute; border-radius:50%; filter:blur(90px); opacity:.45; }
+  .g1 { width:520px;height:520px; background:#6d28d9; top:-160px; right:-120px; }
+  .g2 { width:480px;height:480px; background:#0891b2; bottom:-180px; left:-120px; opacity:.32;}
+  .card { position:relative; text-align:center; z-index:2; padding:0 70px; }
+  .badge { display:inline-flex; align-items:center; gap:10px; padding:10px 22px; border-radius:999px;
+           background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
+           font-family:'Poppins'; font-size:16px; letter-spacing:.18em; text-transform:uppercase; color:#c4b5fd; margin-bottom:30px;}
+  h1 { font-size:80px; font-weight:800; line-height:1.18; text-shadow:0 8px 30px rgba(0,0,0,.4); }
+  h1 .hl { color:#fde68a; }
+  .en { font-family:'Poppins'; font-size:32px; font-weight:600; color:#c7d2fe; margin-top:16px; }
+  .sub { font-size:34px; font-weight:700; margin-top:34px; color:#a7f3d0; }
+  .ensub { font-family:'Poppins'; font-size:22px; color:rgba(255,255,255,.7); margin-top:8px; }
+  .brand { position:absolute; bottom:34px; left:0; right:0; text-align:center; font-family:'Poppins'; font-size:18px; color:rgba(255,255,255,.55); letter-spacing:.08em; z-index:2;}
+  .brand b { color:#fde68a; }
+</style>
+</head>
+<body>
+  <div class="glow g1"></div><div class="glow g2"></div>
+  <div class="card">
+    <div class="badge">🎓 National University of Modern Languages</div>
+    <h1>NUML <span class="hl">বিশ্ববিদ্যালয়ে</span> স্বাগতম</h1>
+    <div class="en">Welcome to NUML University</div>
+    <div class="sub">আপনাদের সাথে পরিচিত হয়ে আমরা আনন্দিত</div>
+    <div class="ensub">It is a pleasure to meet you</div>
+  </div>
+  <div class="brand">Presented by <b>AdMotion</b> &nbsp;·&nbsp; Alberuni Tech &nbsp;·&nbsp; NUML</div>
+</body>
+</html>

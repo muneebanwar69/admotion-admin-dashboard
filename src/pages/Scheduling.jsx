@@ -11,7 +11,8 @@ import { useToast } from "../contexts/ToastContext";
 import {
   Calendar, Cpu, CloudSun, Truck, Layers, Zap, Clock, RefreshCw, AlertCircle,
   Sun, CloudRain, CloudSnow, Cloud, Play, Settings, Trash2, CheckCircle,
-  Timer, MapPin, Target, ListChecks, ArrowRight, Eye, DollarSign, Image as ImageIcon
+  Timer, MapPin, Target, ListChecks, ArrowRight, Eye, DollarSign, Image as ImageIcon,
+  Repeat, Check
 } from "lucide-react";
 
 // Weather icon mapper
@@ -65,7 +66,8 @@ export default function SchedulingPage() {
   const [vehicles, setVehicles] = useState([]);
   const [ads, setAds] = useState([]);
   const [selectedTestVehicle, setSelectedTestVehicle] = useState('');
-  const [selectedTestAd, setSelectedTestAd] = useState('');
+  const [selectedTestAds, setSelectedTestAds] = useState([]); // array of ad ids (multi-select)
+  const [testTransition, setTestTransition] = useState(true); // rotate every 10s vs stay still
   const [testPushing, setTestPushing] = useState(false);
   const [testClearing, setTestClearing] = useState(false);
   const [assignments, setAssignments] = useState([]);
@@ -135,27 +137,45 @@ export default function SchedulingPage() {
     setRunningAi(false);
   };
 
+  const toggleTestAd = (adId) => {
+    setSelectedTestAds(prev =>
+      prev.includes(adId) ? prev.filter(id => id !== adId) : [...prev, adId]
+    );
+  };
+
   const handlePushTestAd = async () => {
-    if (!selectedTestVehicle || !selectedTestAd) {
-      toast.warning('Please select both a vehicle and an ad');
+    if (!selectedTestVehicle || selectedTestAds.length === 0) {
+      toast.warning('Please select a vehicle and at least one ad');
       return;
     }
     setTestPushing(true);
     try {
+      // If transition is OFF, only the first selected ad is shown (stays still).
+      // If ON, all selected ads are assigned and the display rotates every 10s.
+      const adIds = testTransition ? selectedTestAds : selectedTestAds.slice(0, 1);
+      const now = Date.now();
+      const assignedAds = adIds.map((adId, i) => ({
+        adId,
+        startTime: new Date(now).toISOString(),
+        endTime: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+        displayMinutes: 0,           // demo: short rotation (display uses 10s default)
+        campaignId: 'test-mode',
+        order: i,
+        assignedAt: new Date(now).toISOString(),
+      }));
       await updateDoc(doc(db, "vehicles", selectedTestVehicle), {
-        assignedAds: [{
-          adId: selectedTestAd,
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          campaignId: 'test-mode',
-          assignedAt: new Date().toISOString()
-        }],
+        assignedAds,
+        testTransition,              // hint flag for the display
         lastAssignmentUpdate: serverTimestamp()
       });
-      toast.success('Ad pushed to vehicle successfully!');
+      toast.success(
+        testTransition && adIds.length > 1
+          ? `${adIds.length} ads pushed — display will rotate every 10s`
+          : 'Ad pushed to vehicle (single, no transition)'
+      );
     } catch (e) {
       console.error('Test mode push failed:', e);
-      toast.error('Failed to push ad to vehicle');
+      toast.error('Failed to push ads to vehicle');
     }
     setTestPushing(false);
   };
@@ -477,12 +497,12 @@ export default function SchedulingPage() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Quick Test Mode</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Instantly push an ad to a vehicle without waiting for the AI scheduler</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Pick a vehicle, select one or more ads, and push them instantly. With transition on, the screen rotates every 10s like a video.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-              {/* Vehicle Selector */}
+            {/* Row: vehicle + transition toggle */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Select Vehicle</label>
                 <select
@@ -493,77 +513,143 @@ export default function SchedulingPage() {
                   <option value="">-- Choose a vehicle --</option>
                   {vehicles.map(v => (
                     <option key={v.id} value={v.id}>
-                      {v.plateNumber || v.licensePlate || v.id} {v.driverName ? `- ${v.driverName}` : ''}
+                      {v.vehicleName || v.plateNumber || v.carId || v.id}{v.ownerName ? ` - ${v.ownerName}` : ''}
                     </option>
                   ))}
                 </select>
               </div>
-
-              {/* Ad Selector */}
               <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Select Ad</label>
-                <select
-                  value={selectedTestAd}
-                  onChange={(e) => setSelectedTestAd(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Playback</label>
+                <button
+                  type="button"
+                  onClick={() => setTestTransition(t => !t)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    testTransition
+                      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
+                      : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'
+                  }`}
                 >
-                  <option value="">-- Choose an ad --</option>
-                  {ads.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.title || a.name || a.id}
-                    </option>
-                  ))}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <Repeat className={`w-4 h-4 ${testTransition ? 'text-purple-500' : 'text-slate-400'}`} />
+                    {testTransition ? 'Transition every 10s (like a video)' : 'Stay still (single image)'}
+                  </span>
+                  <span className={`relative w-10 h-5 rounded-full transition-colors ${testTransition ? 'bg-purple-500' : 'bg-slate-300 dark:bg-slate-500'}`}>
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${testTransition ? 'left-5' : 'left-0.5'}`} />
+                  </span>
+                </button>
               </div>
+            </div>
 
-              {/* Push Button */}
+            {/* Ad image gallery — click to select one or many */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Select Ads <span className="text-slate-400">({selectedTestAds.length} selected)</span>
+                </label>
+                {selectedTestAds.length > 0 && (
+                  <button onClick={() => setSelectedTestAds([])} className="text-xs text-slate-400 hover:text-red-500 transition-colors">Clear selection</button>
+                )}
+              </div>
+              {ads.length === 0 ? (
+                <p className="text-sm text-slate-400 py-6 text-center">No ads yet. Create one in Ads Management first.</p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 max-h-64 overflow-y-auto p-1">
+                  {ads.map(a => {
+                    const img = a.preview || a.mediaUrl || '';
+                    const sel = selectedTestAds.includes(a.id);
+                    const order = selectedTestAds.indexOf(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => toggleTestAd(a.id)}
+                        title={a.title || a.id}
+                        className={`group relative rounded-xl overflow-hidden border-2 transition-all aspect-square ${
+                          sel ? 'border-purple-500 ring-2 ring-purple-300 dark:ring-purple-700' : 'border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                        }`}
+                      >
+                        {img ? (
+                          <img src={img} alt={a.title || 'ad'} loading="lazy" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                            <ImageIcon className="w-6 h-6 text-slate-400" />
+                          </div>
+                        )}
+                        {/* selection badge with play order */}
+                        {sel && (
+                          <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                            {testTransition ? order + 1 : <Check className="w-3 h-3" />}
+                          </span>
+                        )}
+                        {/* title overlay */}
+                        <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1 text-[10px] text-white truncate text-left">
+                          {a.title || a.id}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Selected preview strip */}
+            {selectedTestAds.length > 0 && (
+              <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
+                  Will play on the screen {testTransition ? `in this order, 10s each:` : `(single still image):`}
+                </p>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {(testTransition ? selectedTestAds : selectedTestAds.slice(0, 1)).map((id, i) => {
+                    const a = adById[id] || {};
+                    const img = a.preview || a.mediaUrl || '';
+                    return (
+                      <React.Fragment key={id}>
+                        {i > 0 && <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0" />}
+                        <div className="relative flex-shrink-0">
+                          {img ? (
+                            <img src={img} alt="" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center"><ImageIcon className="w-5 h-5 text-slate-400" /></div>
+                          )}
+                          <span className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-purple-600 text-white text-[9px] font-bold flex items-center justify-center">{i + 1}</span>
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-3">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={handlePushTestAd}
-                disabled={testPushing || !selectedTestVehicle || !selectedTestAd}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
-                  testPushing || !selectedTestVehicle || !selectedTestAd
+                disabled={testPushing || !selectedTestVehicle || selectedTestAds.length === 0}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+                  testPushing || !selectedTestVehicle || selectedTestAds.length === 0
                     ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40'
                 }`}
               >
-                {testPushing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Pushing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Push Ad to Vehicle
-                  </>
-                )}
+                {testPushing ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Pushing...</>)
+                  : (<><CheckCircle className="w-4 h-4" /> Push {selectedTestAds.length > 1 && testTransition ? `${selectedTestAds.length} Ads` : 'Ad'} to Vehicle</>)}
               </motion.button>
 
-              {/* Clear Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={handleClearTest}
                 disabled={testClearing || !selectedTestVehicle}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
                   testClearing || !selectedTestVehicle
                     ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
                     : 'bg-white dark:bg-slate-700 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700'
                 }`}
               >
-                {testClearing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Clearing...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Clear Test
-                  </>
-                )}
+                {testClearing ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Clearing...</>)
+                  : (<><Trash2 className="w-4 h-4" /> Clear Test</>)}
               </motion.button>
             </div>
           </motion.div>
